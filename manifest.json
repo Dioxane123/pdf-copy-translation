@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "PDF 复制换行转空格",
+  "version": "1.2.1",
+  "description": "PDF 复制时将换行转为空格；扩展阅读模式支持复制翻译浮窗，提供谷歌翻译与加密保存密钥的自定义模型。",
+  "minimum_chrome_version": "116",
+  "permissions": ["tabs", "storage", "offscreen", "clipboardRead", "clipboardWrite", "webRequest"],
+  "host_permissions": ["http://*/*", "https://*/*", "file:///*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "content_security_policy": { "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
+  "action": { "default_title": "PDF 复制换行转空格", "default_popup": "popup.html" }
+}

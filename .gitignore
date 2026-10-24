@@ -1,0 +1,19 @@
+# Build output belongs in GitHub Releases.
+dist/
+*.zip
+*.zip.sha256
+__pycache__/
+*.py[cod]
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Local credentials and editor files must never be committed.
+.env
+.env.*
+*.pem
+*.key
+*.local.json
+.vscode/
+.idea/
+tests/.*-run.mjs

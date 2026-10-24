@@ -1,0 +1,13 @@
+:root { color-scheme: light dark; font: 14px/1.6 system-ui, sans-serif; }
+body { width: 310px; margin: 0; padding: 20px; }
+h1 { margin: 0 0 16px; font-size: 19px; }
+label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+input { width: 17px; height: 17px; accent-color: #16834d; }
+.switch { font-weight: 650; }
+.manual { margin-top: 18px; }
+#status { padding: 10px 12px; background: light-dark(#eef5f0, #213a2a); border-radius: 8px; }
+p { margin: 12px 0 0; }
+.hint { font-size: 12px; color: light-dark(#626969, #b5bcbc); }
+.reader-actions { display: flex; gap: 8px; margin-top: 18px; }
+button { cursor: pointer; font: inherit; padding: 7px 10px; border: 1px solid light-dark(#bbcbbf, #52695a); border-radius: 7px; color: inherit; background: transparent; }
+#open-reader { background: #27674d; color: white; border-color: #27674d; }

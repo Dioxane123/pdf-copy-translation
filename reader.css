@@ -1,0 +1,26 @@
+:root { --assistant-bar-height: 38px; }
+#outerContainer { top: var(--assistant-bar-height) !important; height: calc(100% - var(--assistant-bar-height)) !important; }
+#translation-bar { position: fixed; z-index: 10000; top: 0; inset-inline: 0; height: 38px; box-sizing: border-box; display: flex; align-items: center; gap: 16px; padding: 0 16px; font: 12px/1.4 system-ui, sans-serif; background: light-dark(#f2f5f1, #25302a); color: light-dark(#334b3e, #dce7de); border-bottom: 1px solid light-dark(#d6ded7, #445648); color-scheme: light dark; }
+#translation-bar .brand { font-weight: 650; white-space: nowrap; }
+#reader-mode-status { margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .8; }
+#translation-bar button { font: inherit; color: inherit; background: transparent; border: 0; padding: 5px 7px; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+#translation-bar button:hover { background: light-dark(#e1e9e0, #374b3c); }
+#reader-welcome { position: fixed; z-index: 500; top: 26%; left: 50%; transform: translateX(-50%); max-width: 540px; width: calc(100vw - 80px); padding: 32px; box-sizing: border-box; border-radius: 16px; text-align: center; background: light-dark(#f7f9f6, #25302a); color: light-dark(#314b3a, #e4ede7); font: 15px/1.7 system-ui, sans-serif; box-shadow: 0 8px 40px #0002; color-scheme: light dark; }
+#reader-welcome h1 { margin: 14px 0; font-size: 24px; font-weight: 600; }
+.welcome-mark { font-size: 20px; color: light-dark(#52755f, #a6c7b2); }
+#reader-welcome button { cursor: pointer; background: #326a4d; color: white; padding: 10px 18px; border-radius: 7px; border: none; font: inherit; margin: 14px 0; }
+.welcome-hint { font-size: 12px; opacity: .7; }
+#translation-card { position: fixed; z-index: 20000; box-sizing: border-box; max-height: min(430px, calc(100vh - 70px)); margin: 0; border: 1px solid light-dark(#d4ddd1, #4e6250); border-radius: 12px; background: light-dark(#fbfcf8, #263129); color: light-dark(#2e382c, #e8eee5); box-shadow: 0 6px 28px #18291d26; font: 14px/1.75 system-ui, sans-serif; color-scheme: light dark; display: flex; flex-direction: column; outline: none; overflow: hidden; user-select: text; }
+#translation-card[hidden], #reader-welcome[hidden], #translation-card [hidden] { display: none !important; }
+#translation-card header { display: flex; align-items: center; gap: 8px; padding: 8px 13px 0; font-size: 11px; color: light-dark(#687764, #b1c2ab); user-select: none; }
+#translation-close { margin-left: auto; font-size: 21px !important; line-height: 1 !important; }
+#translation-retained { font-size: 10px; border: 1px solid light-dark(#d2dfcb, #64765c); border-radius: 4px; padding: 0 4px; }
+#translation-result { min-height: 30px; padding: 10px 16px 12px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+#translation-card[data-state=loading] #translation-result { color: light-dark(#7c8878, #a9b5a3); }
+#translation-card[data-state=error] #translation-result { color: light-dark(#954b40, #f2ba9c); }
+#translation-card footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 13px; border-top: 1px solid light-dark(#e7ece2, #40503c); font-size: 10px; color: light-dark(#7c8878, #a9b5a3); user-select: none; }
+#translation-hint { flex: 1; min-width: 100px; }
+#translation-card button { cursor: pointer; font: inherit; color: inherit; border: 0; background: transparent; padding: 2px 5px; border-radius: 4px; }
+#translation-card button:hover { background: light-dark(#eaf0e4, #40513a); }
+#translation-card button:focus-visible { outline: 2px solid #7f9f73; outline-offset: 1px; }
+@media (max-width: 520px) { #translation-bar { padding-inline: 8px; gap: 4px; } #translation-bar .brand { display: none; } }
