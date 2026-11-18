@@ -39,8 +39,11 @@
     const track = tracks.find(t => t.vssId && t.vssId === selected?.vssId) ||
       tracks.find(t => t.languageCode === selected?.languageCode && t.kind === selected?.kind) ||
       tracks[audio?.defaultCaptionTrackIndex] || tracks[audio?.captionTrackIndices?.[0]] || tracks[0];
+    const style = player?.getSubtitlesUserSettings?.();
     return {
-      playerVideoId, live: Boolean(response?.videoDetails?.isLive || response?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails?.isLiveNow),
+      playerVideoId, captionsOn: player?.isSubtitlesOn?.(),
+      appearance: style && { color: style.color, background: style.background, backgroundOpacity: style.backgroundOpacity },
+      live: Boolean(response?.videoDetails?.isLive || response?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails?.isLiveNow),
       track: track && { key: track.vssId || track.languageCode + ':' + (track.kind || ''), language: track.languageCode, url: track.baseUrl },
       transcript: transcript ? transcriptInfo(videoId, watch) : null,
     };

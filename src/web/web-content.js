@@ -7,8 +7,8 @@ const webTranslation = (() => {
     if (!result || result.error) throw new Error(result?.error || '翻译后台未响应。');
     return result;
   }
-  function options() {
-    if (!preferences) preferences = send('translation-page-options').catch(error => {
+  function options(refresh = false) {
+    if (refresh || !preferences) preferences = send('translation-page-options').catch(error => {
       preferences = undefined;
       throw error;
     });
@@ -17,7 +17,7 @@ const webTranslation = (() => {
   chrome.runtime.onMessage.addListener(message => {
     if (message.type !== 'translation-options-changed') return;
     preferences = Promise.resolve(message.options);
-    for (const listener of listeners) listener(message.options);
+    for (const listener of listeners) listener(message.options, message.change);
   });
   return {
     send, options, onChange: listener => listeners.add(listener),
@@ -31,13 +31,23 @@ const webTranslation = (() => {
   const editable = 'input,textarea,select,[role="textbox"],[contenteditable]:not([contenteditable="false"])';
   const excluded = editable + ',button,[data-pdf-copy-translation],.html5-video-player';
   const paragraphs = 'p,h1,h2,h3,h4,h5,h6,li,dt,dd,blockquote,figcaption,td,th,pre';
+  const youtube = /(^|\.)youtube\.com$/.test(location.hostname);
+  const commentRows = 'ytd-comment-view-model,ytd-comment-renderer,yt-comment-view-model,ytm-comment-renderer,ytm-comment-view-model';
+  const commentBody = '#content-text,yt-attributed-string[slot="content"],yt-formatted-string[slot="content"],ytd-expander #content yt-attributed-string,.comment-text,.ytCommentViewModelCommentText';
   const views = new WeakMap();
+  const sources = new WeakMap();
   let pointer, armed;
 
   function paragraphAtPointer() {
     if (!pointer || document.designMode === 'on' || document.activeElement?.closest(editable)) return null;
     let element = document.elementFromPoint(pointer.x, pointer.y);
     if (element?.closest(excluded)) return null;
+    const comment = youtube && element?.closest(commentRows);
+    if (comment) {
+      const body = element.closest(commentBody) ||
+        (element.matches('ytd-expander #content,.comment-text-container') && element.querySelector(commentBody));
+      return body instanceof HTMLElement && comment.contains(body) ? body : null;
+    }
     for (; element && element !== document.body && element !== document.documentElement; element = element.parentElement) {
       if (!(element instanceof HTMLElement)) continue;
       const semantic = element.matches(paragraphs);
@@ -47,6 +57,14 @@ const webTranslation = (() => {
       if (element.innerText.trim()) return element;
     }
     return null;
+  }
+
+  function readText(block, comment) {
+    if (!comment || !block.querySelector('img[alt]')) return block.innerText.trim();
+    const copy = block.cloneNode(true);
+    for (const img of copy.querySelectorAll('img[alt]')) img.replaceWith(img.alt);
+    for (const br of copy.querySelectorAll('br')) br.replaceWith('\n');
+    return copy.textContent.trim();
   }
 
   function remove(block) {
@@ -66,7 +84,8 @@ const webTranslation = (() => {
       remove(block);
       if (!previous.failed) return;
     }
-    const text = block.innerText.trim();
+    const comment = youtube && block.closest(commentRows);
+    const text = readText(block, comment);
     if (!text) return;
     const host = document.createElement('span');
     host.dataset.pdfCopyTranslation = 'paragraph';
@@ -78,10 +97,20 @@ const webTranslation = (() => {
     result.setAttribute('role', 'status');
     result.textContent = '正在翻译…';
     root.append(style, result);
-    block.append(host);
-    const view = { host, requestId: webTranslation.requestId(), observer: new MutationObserver(() => remove(block)) };
+    // YouTube clips the body (including slotted content) of collapsed comments.
+    // Keep the translation in the same comment, below its expand/collapse control.
+    if (comment) {
+      const expander = block.closest('ytd-expander,ytm-expander,#expander,.comment-text-container');
+      host.style.fontSize = getComputedStyle(block).fontSize;
+      (comment.contains(expander) ? expander : block).after(host);
+    } else block.append(host);
+    const observer = new MutationObserver(() => {
+      if (!comment || !comment.contains(block) || !comment.contains(host) || readText(block, comment) !== text) remove(block);
+    });
+    const view = { host, requestId: webTranslation.requestId(), observer };
     views.set(block, view);
-    view.observer.observe(block, { subtree: true, childList: true, characterData: true });
+    sources.set(host, block);
+    observer.observe(comment || block, { subtree: true, childList: true, characterData: true });
     try {
       const response = await webTranslation.send('translation-run', { scope: 'paragraph', requestId: view.requestId, text });
       if (views.get(block) !== view) return;
@@ -118,8 +147,8 @@ const webTranslation = (() => {
     if (event.isTrusted && event.key === 'Shift' && block && block === paragraphAtPointer()) void translate(block).catch(() => {});
   }, true);
   function clearViews() {
-    for (const host of document.querySelectorAll('[data-pdf-copy-translation="paragraph"]')) remove(host.parentElement);
+    for (const host of document.querySelectorAll('[data-pdf-copy-translation="paragraph"]')) remove(sources.get(host));
   }
   window.addEventListener('pagehide', clearViews);
-  webTranslation.onChange(clearViews);
+  webTranslation.onChange((_options, change) => { if (change !== 'youtube') clearViews(); });
 })();

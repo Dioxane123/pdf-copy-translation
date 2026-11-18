@@ -83,6 +83,11 @@ async function action(operation) {
   finally { for (const id of ['api-key', 'save-password', 'unlock-password']) $(id).value = ''; }
 }
 $('provider').addEventListener('change', providerChanged);
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && typeof changes.youtubeTranslationEnabled?.newValue === 'boolean') {
+    $('youtube-enabled').checked = changes.youtubeTranslationEnabled.newValue;
+  }
+});
 $('model-preset').addEventListener('change', () => {
   const updated = applyModelPreset({ baseUrl: $('base-url').value, model: $('model').value }, $('model-preset').value);
   $('base-url').value = updated.baseUrl;

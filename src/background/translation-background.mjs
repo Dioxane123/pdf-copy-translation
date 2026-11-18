@@ -4,6 +4,7 @@ import { normalizeModelSettings } from '../translation/model-presets.mjs';
 
 const pending = new Map();
 const settingsKey = 'translationSettings';
+const youtubeKey = 'youtubeTranslationEnabled';
 const vaultKey = 'translationVault';
 const sessionKey = 'translationUnlocked';
 const { options_ui, action } = chrome.runtime.getManifest();
@@ -13,26 +14,31 @@ function extensionPage(sender, paths) {
   return sender.id === chrome.runtime.id && paths.some((path) => sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL(path));
 }
 
+function savedSettings(stored) {
+  const saved = stored[settingsKey];
+  // The toolbar updates one key atomically. Older versions stored it inside translationSettings.
+  return { ...DEFAULT_TRANSLATION, ...saved, ...normalizeModelSettings(saved),
+    youtubeEnabled: stored[youtubeKey] ?? saved?.youtubeEnabled ?? DEFAULT_TRANSLATION.youtubeEnabled };
+}
+
 async function publicSettings() {
-  const stored = await chrome.storage.local.get([settingsKey, vaultKey]);
+  const stored = await chrome.storage.local.get([settingsKey, youtubeKey, vaultKey]);
   const session = await chrome.storage.session.get(sessionKey);
-  const settings = { ...DEFAULT_TRANSLATION, ...stored[settingsKey], ...normalizeModelSettings(stored[settingsKey]) };
+  const settings = savedSettings(stored);
   const endpoint = settings.provider === 'model' && settings.baseUrl ? normalizeEndpoint(settings.baseUrl) : '';
   return { settings, hasKey: Boolean(stored[vaultKey]), unlocked: Boolean(session[sessionKey]?.endpoint === endpoint && session[sessionKey]?.apiKey) };
 }
 
-function pageOptions(settings = {}) {
+function pageOptions(settings) {
   return {
-    paragraphEnabled: settings.paragraphEnabled ?? DEFAULT_TRANSLATION.paragraphEnabled,
-    youtubeEnabled: Boolean(settings.youtubeEnabled),
-    target: settings.target ?? DEFAULT_TRANSLATION.target,
+    paragraphEnabled: settings.paragraphEnabled, youtubeEnabled: settings.youtubeEnabled, target: settings.target,
   };
 }
 
-async function notifyPages() {
+async function notifyPages(change = 'settings') {
   const state = await publicSettings();
   const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*', 'file:///*'] });
-  const message = { type: 'translation-options-changed', options: pageOptions(state.settings) };
+  const message = { type: 'translation-options-changed', options: pageOptions(state.settings), change };
   await Promise.allSettled(tabs.map(tab => chrome.tabs.sendMessage(tab.id, message)));
   return state;
 }
@@ -40,8 +46,14 @@ async function notifyPages() {
 export async function handleTranslationMessage(message, sender) {
   const reader = extensionPage(sender, ['pdfjs/web/viewer.html']);
   const webpage = sender.id === chrome.runtime.id && Number.isInteger(sender.tab?.id) && /^(https?|file):\/\//.test(sender.url || '');
+  const youtube = webpage && /^https:\/\/(?:(?:www\.|m\.)?youtube\.com|www\.youtube-nocookie\.com)\//.test(sender.url);
   if (webpage && message.type === 'translation-page-options') {
-    return pageOptions((await chrome.storage.local.get(settingsKey))[settingsKey]);
+    return pageOptions(savedSettings(await chrome.storage.local.get([settingsKey, youtubeKey])));
+  }
+  if (youtube && message.type === 'translation-youtube-enabled' && typeof message.enabled === 'boolean') {
+    await chrome.storage.local.set({ [youtubeKey]: message.enabled });
+    if (!message.enabled) cancelAll('youtube');
+    return pageOptions((await notifyPages('youtube')).settings);
   }
   if (message.type === 'translation-settings' && (reader || extensionPage(sender, [optionsPage, action.default_popup]))) return publicSettings();
   if (message.type === 'translation-save') {
@@ -59,7 +71,8 @@ export async function handleTranslationMessage(message, sender) {
         throw new Error('首次配置或修改服务地址时，请输入 API_KEY 和解锁口令。');
       }
     }
-    await chrome.storage.local.set({ [settingsKey]: settings, ...(vault ? { [vaultKey]: vault } : {}) });
+    const { youtubeEnabled, ...general } = settings;
+    await chrome.storage.local.set({ [settingsKey]: general, [youtubeKey]: youtubeEnabled, ...(vault ? { [vaultKey]: vault } : {}) });
     if (unlocked) await chrome.storage.session.set({ [sessionKey]: unlocked });
     cancelAll();
     return notifyPages();
@@ -81,7 +94,6 @@ export async function handleTranslationMessage(message, sender) {
     return notifyPages();
   }
   const scope = reader ? 'reader' : message.scope;
-  const youtube = webpage && /^https:\/\/(?:www\.|m\.)?youtube\.com\/|^https:\/\/www\.youtube-nocookie\.com\//.test(sender.url);
   if (!reader && !(webpage && scope === 'paragraph') && !(youtube && scope === 'youtube')) throw new Error('此页面不能访问翻译服务。');
   if (typeof message.requestId !== 'string' || !message.requestId || message.requestId.length > 100) throw new Error('翻译请求无效。');
   const document = sender.documentId || `${sender.tab?.id}:${sender.frameId}`;
@@ -94,14 +106,13 @@ export async function handleTranslationMessage(message, sender) {
   if (message.type !== (scope === 'youtube' ? 'translation-captions' : 'translation-run')) throw new Error('未知翻译操作。');
   pending.get(owner)?.controller.abort();
   const controller = new AbortController();
-  const job = { controller, requestId: message.requestId, tabId: sender.tab?.id };
+  const job = { controller, scope, requestId: message.requestId, tabId: sender.tab?.id };
   pending.set(owner, job);
   let timer, timeout, timedOut = false;
   // Keep the worker alive only while this bounded translation request is pending.
   const keepAlive = setInterval(() => { void chrome.runtime.getPlatformInfo().catch(() => {}); }, 20000);
   try {
-    const saved = (await chrome.storage.local.get(settingsKey))[settingsKey];
-    const settings = { ...DEFAULT_TRANSLATION, ...saved, ...normalizeModelSettings(saved) };
+    const settings = savedSettings(await chrome.storage.local.get([settingsKey, youtubeKey]));
     if (reader && !settings.enabled) throw new Error('复制翻译尚未开启，请在翻译设置中启用。');
     if (scope === 'paragraph' && !settings.paragraphEnabled) throw new Error('网页段落翻译已关闭。');
     if (scope === 'youtube' && !settings.youtubeEnabled) throw new Error('YouTube 双语字幕已关闭。');
@@ -130,9 +141,12 @@ export async function handleTranslationMessage(message, sender) {
   }
 }
 
-function cancelAll() {
-  for (const job of pending.values()) job.controller.abort();
-  pending.clear();
+function cancelAll(scope) {
+  for (const [owner, job] of pending) {
+    if (scope && scope !== job.scope) continue;
+    job.controller.abort();
+    pending.delete(owner);
+  }
 }
 
 chrome.tabs.onRemoved.addListener((tabId) => {

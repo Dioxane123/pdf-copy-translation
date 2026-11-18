@@ -1,35 +1,57 @@
 .html5-video-player[data-pdf-copy-captions] .ytp-caption-window-container {
   visibility: hidden !important;
 }
+.pdf-copy-caption-toggle .pdf-copy-caption-icon {
+  position: relative;
+  display: inline-block;
+  width: 23px;
+  height: 23px;
+  box-sizing: border-box;
+  vertical-align: middle;
+  border-radius: 5px;
+  padding: 2px 8px 6px 2px;
+  background: rgb(85 85 85 / 85%);
+  color: white;
+  font: 700 14px/16px Roboto, Arial, sans-serif;
+  text-align: center;
+  text-shadow: none;
+}
+.pdf-copy-caption-toggle[aria-pressed="true"] .pdf-copy-caption-icon { background: #d93681; }
+.pdf-copy-caption-icon > span { position: absolute; right: 2px; bottom: 1px; font: 700 12px/13px Roboto, Arial, sans-serif; }
+.pdf-copy-caption-toggle:focus-visible { outline: 2px solid white; outline-offset: -3px; }
 [data-pdf-copy-translation="youtube"] {
   position: absolute;
   z-index: 42;
   inset-inline: 4%;
   bottom: max(8%, 64px);
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  justify-content: center;
+  container-type: inline-size;
   pointer-events: none;
   text-align: center;
-  font: 500 clamp(16px, 2vw, 30px)/1.3 Roboto, Arial, sans-serif;
 }
 .ytp-autohide [data-pdf-copy-translation="youtube"] { bottom: 6%; }
-[data-pdf-copy-translation="youtube"] > div {
+.pdf-copy-caption-box {
   max-width: 100%;
   box-sizing: border-box;
-  border-radius: 4px;
-  padding: .08em .4em;
-  background: rgb(12 15 16 / 87%);
-  color: #fff;
+  border-radius: .45em;
+  padding: .28em .62em;
+  background-color: rgb(8 8 8 / 75%);
+  color: white;
+  font: 400 clamp(16px, 2.4cqw, 56px)/1.35 Roboto, Arial, sans-serif;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 65%);
   overflow-wrap: anywhere;
   white-space: pre-line;
 }
-[data-pdf-copy-translation="youtube"] .pdf-copy-translated { color: #ffe6a5; }
-[data-pdf-copy-translation="youtube"] .pdf-copy-notice { font: 500 14px/1.5 Roboto, Arial, sans-serif; padding: 3px 9px; }
-[data-pdf-copy-translation="youtube"] button {
+.pdf-copy-caption-box > :is(.pdf-copy-original, .pdf-copy-translated) {
+  font: inherit;
+  color: inherit;
+  text-shadow: inherit;
+}
+.pdf-copy-caption-box .pdf-copy-notice { font: 500 14px/1.5 Roboto, Arial, sans-serif; }
+.pdf-copy-caption-box button {
   pointer-events: auto;
-  color: #fff;
+  color: inherit;
   background: transparent;
   border: 0;
   margin-inline-start: .6em;
@@ -37,5 +59,6 @@
   cursor: pointer;
   font: inherit;
 }
-[data-pdf-copy-translation="youtube"] > :empty,
+.pdf-copy-caption-box > :empty,
+[data-pdf-copy-translation="youtube"][hidden],
 [data-pdf-copy-translation="youtube"] [hidden] { display: none !important; }

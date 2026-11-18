@@ -1,6 +1,6 @@
 import { DEFAULT_MODEL_SETTINGS, normalizeModelSettings, buildModelParameters } from './model-presets.mjs';
 
-export const DEFAULT_TRANSLATION = Object.freeze({ enabled: false, paragraphEnabled: true, youtubeEnabled: false, provider: 'google', target: 'zh-CN', baseUrl: '', model: '', ...DEFAULT_MODEL_SETTINGS });
+export const DEFAULT_TRANSLATION = Object.freeze({ enabled: false, paragraphEnabled: true, youtubeEnabled: true, provider: 'google', target: 'zh-CN', baseUrl: '', model: '', ...DEFAULT_MODEL_SETTINGS });
 export const TARGETS = Object.freeze({ 'zh-CN': '简体中文', en: '英语', ja: '日语', ko: '韩语', fr: '法语', de: '德语', es: '西班牙语', 'zh-TW': '繁体中文' });
 export const MAX_TEXT_LENGTH = 12000;
 
@@ -18,7 +18,7 @@ export function normalizeEndpoint(value) {
 export function validateSettings(input) {
   const result = {
     enabled: Boolean(input.enabled), paragraphEnabled: Boolean(input.paragraphEnabled ?? DEFAULT_TRANSLATION.paragraphEnabled),
-    youtubeEnabled: Boolean(input.youtubeEnabled), provider: input.provider, target: input.target,
+    youtubeEnabled: Boolean(input.youtubeEnabled ?? DEFAULT_TRANSLATION.youtubeEnabled), provider: input.provider, target: input.target,
     baseUrl: String(input.baseUrl || '').trim(), model: String(input.model || '').trim(),
     ...normalizeModelSettings(input),
   };

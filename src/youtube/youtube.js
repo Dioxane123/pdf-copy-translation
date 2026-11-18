@@ -1,5 +1,5 @@
 (() => {
-  let enabled = false, session, timer, resources, settingsRevision = 0;
+  let options, session, timer, resources, savingSwitch = false, settingsRevision = 0;
 
   function videoId() {
     const url = new URL(location.href);
@@ -17,10 +17,13 @@
     if (s.job) void webTranslation.cancel('youtube', s.job.requestId);
     s.job = null;
   }
-  function clearTrack(s) {
+  function stopRequests(s) {
     s.loading?.abort();
     s.loading = null;
     cancelBatch(s);
+  }
+  function clearTrack(s) {
+    stopRequests(s);
     s.cues = [];
     s.translations = new Map();
     s.attempted = new Set();
@@ -33,52 +36,31 @@
     session = null;
     clearTrack(s);
     s.videoListeners?.abort();
-    s.player?.removeAttribute('data-pdf-copy-captions');
-    s.overlay?.remove();
+    s.view.attach(null);
+    clearInterval(timer);
+    resources?.disconnect();
+    resources = null;
   }
 
-  function mount(s, player) {
-    if (!s.overlay) {
-      s.overlay = document.createElement('div');
-      s.overlay.dataset.pdfCopyTranslation = 'youtube';
-      s.overlay.setAttribute('translate', 'no');
-      s.original = document.createElement('div');
-      s.original.className = 'pdf-copy-original';
-      s.translated = document.createElement('div');
-      s.translated.className = 'pdf-copy-translated';
-      s.translated.lang = s.target;
-      s.original.dir = s.translated.dir = 'auto';
-      s.notice = document.createElement('div');
-      s.notice.className = 'pdf-copy-notice';
-      s.status = document.createElement('span');
-      s.status.setAttribute('role', 'status');
-      const retry = document.createElement('button');
-      retry.type = 'button';
-      retry.textContent = '重试';
-      retry.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!event.isTrusted || !current(s)) return;
-        s.failedBatch = null;
-        s.error = '';
-        refresh(true);
-      });
-      s.retry = retry;
-      s.notice.append(s.status, retry);
-      s.overlay.append(s.original, s.translated, s.notice);
-    }
-    if (s.overlay.parentElement !== player) player.append(s.overlay);
+  async function toggle(s) {
+    if (savingSwitch || !current(s)) return;
+    savingSwitch = true;
+    try {
+      await webTranslation.send('translation-youtube-enabled', { enabled: !options.youtubeEnabled });
+    } catch (error) {
+      if (current(s)) s.view.switchError(error.message);
+    } finally { savingSwitch = false; }
   }
 
   function bindPlayer(s) {
     const player = document.querySelector('ytd-reel-video-renderer[is-active] .html5-video-player') ||
       document.querySelector('#movie_player, .html5-video-player');
     if (s.player !== player) {
-      s.player?.removeAttribute('data-pdf-copy-captions');
-      s.overlay?.remove();
       s.player = player;
+      s.apiCC = undefined;
+      s.lastProbe = -Infinity;
     }
-    if (player) mount(s, player);
+    s.view.attach(player);
     const video = player?.querySelector('video.html5-main-video, video');
     if (video === s.video) return;
     s.videoListeners?.abort();
@@ -88,19 +70,7 @@
     for (const event of ['timeupdate', 'loadedmetadata', 'seeking', 'seeked', 'ratechange', 'play', 'pause']) {
       video.addEventListener(event, () => tick(s), { signal: s.videoListeners.signal });
     }
-  }
-
-  function setText(node, value) {
-    if (node.textContent !== value) node.textContent = value;
-  }
-  function paint(s, original, translation, notice, failed = false) {
-    if (!s.player || !s.overlay) return;
-    s.player.toggleAttribute('data-pdf-copy-captions', Boolean(original));
-    setText(s.original, original);
-    setText(s.translated, translation);
-    setText(s.status, notice);
-    if (s.notice.hidden !== !notice) s.notice.hidden = !notice;
-    if (s.retry.hidden !== !failed) s.retry.hidden = !failed;
+    video.textTracks.addEventListener('change', () => refresh(true), { signal: s.videoListeners.signal });
   }
 
   async function translate(s, batch) {
@@ -120,9 +90,12 @@
   }
 
   function tick(s) {
-    if (!current(s)) return;
+    if (!current(s) || !s.active) return;
     const otherMedia = s.foreignPlayer || s.player?.matches('.ad-showing,.ad-interrupting');
-    if (!s.cues.length) { paint(s, '', '', otherMedia ? '' : s.error || '正在读取视频字幕…', Boolean(s.error && !s.live)); return; }
+    if (!s.cues.length) {
+      s.view.paint({ message: otherMedia ? '' : s.error || '正在读取视频字幕…', failed: Boolean(s.error && !s.live) });
+      return;
+    }
     // Preload the requested video during a pre-roll or a player handoff, using
     // the content timeline even while the <video> element belongs to an ad.
     if (!otherMedia && s.video && (s.video.readyState || s.video.currentTime)) s.contentTime = 1000 * s.video.currentTime;
@@ -139,15 +112,13 @@
       }
     }
     const translation = active ? s.translations.get(index) || '' : '';
-    if (otherMedia) { paint(s, '', '', ''); return; }
+    if (otherMedia) { s.view.paint(); return; }
     const error = batch && s.failedBatch?.message;
     const status = error || (s.job ? (translation ? '正在预译后续字幕…' : '正在预译字幕…') : '');
-    paint(s, active ? s.cues[index].text : '', translation, status, Boolean(error));
+    s.view.paint({ source: active ? s.cues[index].text : '', translated: translation, message: status, failed: Boolean(error), timeline: true });
   }
 
-  function probe(s) {
-    s.lastProbe = performance.now();
-    const info = youtubeSource.metadata(s.id);
+  function probe(s, info) {
     s.foreignPlayer = Boolean(info?.playerVideoId && info.playerVideoId !== s.id);
     s.live = Boolean(info?.live);
     if (s.live) {
@@ -178,21 +149,64 @@
   }
 
   function refresh(force = false) {
-    if (!enabled) return;
+    if (!options) return;
     const id = videoId();
     if (session && session.id !== id) close();
     if (!id) return;
     if (!session) {
-      session = { id, target: targetLanguage, opened: performance.now(), start: startTime(), observed: new Map(), lastProbe: -Infinity };
-      clearTrack(session);
+      const s = { id, opened: performance.now(), start: startTime(), observed: new Map(), lastProbe: -Infinity };
+      s.view = createYouTubeCaptionView({
+        ccChanged: () => { if (current(s)) refresh(true); },
+        toggle: () => toggle(s),
+        retry: () => {
+          if (!current(s) || !s.active) return;
+          s.failedBatch = null;
+          s.error = '';
+          refresh(true);
+        },
+      });
+      s.view.setLanguage(options.target);
+      clearTrack(s);
+      session = s;
+      timer = setInterval(refresh, 250);
     }
-    bindPlayer(session);
-    if (force || performance.now() - session.lastProbe >= (session.key ? 2500 : 450)) probe(session);
-    tick(session);
+    const s = session;
+    bindPlayer(s);
+    const native = s.view.nativeCC();
+    const due = force || performance.now() - s.lastProbe >= (s.key ? 2500 : 450);
+    let info;
+    if (s.player && options.youtubeEnabled && native !== false && (due || (native && !s.active))) {
+      info = youtubeSource.metadata(s.id);
+      s.lastProbe = performance.now();
+      s.apiCC = info?.captionsOn;
+      s.appearance = info?.appearance;
+    }
+    const ccOn = native ?? s.apiCC ?? Array.from(s.video?.textTracks || []).some(t => ['captions', 'subtitles'].includes(t.kind) && t.mode === 'showing');
+    s.view.setButton(options.youtubeEnabled, ccOn);
+    if (!options.youtubeEnabled || !ccOn || !s.player) {
+      if (s.active) {
+        s.active = false;
+        stopRequests(s);
+        s.failedBatch = null;
+        s.error = '';
+        s.view.paint();
+        resources?.disconnect();
+        resources = null;
+      }
+      return;
+    }
+    if (!s.active || due) probe(s, info);
+    s.active = true;
+    if (!resources) {
+      resources = new PerformanceObserver(observeResources);
+      resources.observe({ type: 'resource', buffered: true });
+    }
+    s.view.styleBox(s.appearance);
+    tick(s);
   }
   function observeResources(entries) {
     const s = session;
-    if (!s) return;
+    if (!s?.active) return;
     let changed = false;
     for (const entry of entries.getEntries()) {
       if (!entry.name.includes('/api/timedtext?')) continue;
@@ -206,25 +220,23 @@
     if (changed) refresh(true);
   }
 
-  let targetLanguage;
-  function configure(options) {
-    clearInterval(timer);
-    resources?.disconnect();
-    close();
-    enabled = options.youtubeEnabled;
-    targetLanguage = options.target;
-    if (!enabled) return;
+  function configure(updated, change) {
+    options = updated;
+    if (session && change !== 'youtube') {
+      clearTrack(session);
+      session.view.setLanguage(options.target);
+    }
     refresh(true);
-    resources = new PerformanceObserver(observeResources);
-    resources.observe({ type: 'resource', buffered: true });
-    timer = setInterval(refresh, 250);
   }
-  for (const event of ['yt-navigate-finish', 'yt-page-data-updated', 'popstate', 'pageshow']) {
+  for (const event of ['yt-navigate-finish', 'yt-page-data-updated', 'popstate']) {
     window.addEventListener(event, () => refresh(true), true);
   }
-  window.addEventListener('pagehide', () => { clearInterval(timer); resources?.disconnect(); close(); });
-  window.addEventListener('pageshow', event => { if (event.persisted && enabled) configure({ youtubeEnabled: true, target: targetLanguage }); });
-  webTranslation.onChange(options => { settingsRevision++; configure(options); });
-  const revision = settingsRevision;
-  webTranslation.options().then(options => { if (settingsRevision === revision) configure(options); }).catch(() => {});
+  window.addEventListener('pagehide', close);
+  window.addEventListener('pageshow', event => { if (event.persisted) readOptions(true); });
+  webTranslation.onChange((updated, change) => { settingsRevision++; configure(updated, change); });
+  function readOptions(refresh = false) {
+    const revision = settingsRevision;
+    webTranslation.options(refresh).then(updated => { if (settingsRevision === revision) configure(updated); }).catch(() => {});
+  }
+  readOptions();
 })();

@@ -26,6 +26,15 @@ function installFixture() {
   player.getPlayerResponse = () => active;
   player.getVideoData = () => ({ video_id: active.videoDetails.videoId });
   player.getOption = () => ({ languageCode: window.captionLanguage || 'en' });
+  const cc = () => player.querySelector('.ytp-subtitles-button');
+  player.isSubtitlesOn = () => cc()?.getAttribute('aria-pressed') === 'true';
+  function switchCC() {
+    const on = !player.isSubtitlesOn();
+    cc().setAttribute('aria-pressed', String(on));
+    player.querySelector('.ytp-caption-window-container').hidden = !on;
+  }
+  player.addEventListener('click', e => { if (e.target.closest('.ytp-subtitles-button')) switchCC(); });
+  document.addEventListener('keydown', e => { if (e.key === 'c') switchCC(); });
   window.changeVideo = id => {
     history.pushState(null, '', '/watch?v=' + id);
     active = response(id);
@@ -33,9 +42,21 @@ function installFixture() {
     window.dispatchEvent(new Event('yt-navigate-finish'));
   };
 }
-const html = `<!doctype html><meta charset="utf-8"><style>body{margin:0}#movie_player{position:relative;height:300px;width:800px}p{padding:10px}</style>
-<div id="movie_player" class="html5-video-player"><video muted preload="auto"></video><div class="ytp-caption-window-container">Native</div></div>
+const html = `<!doctype html><meta charset="utf-8"><style>
+body{margin:0}#movie_player{position:relative;height:300px;width:800px}p{padding:10px}
+.ytp-right-controls{position:absolute;bottom:0;right:0}.ytp-button{width:40px;height:36px}
+.ytp-caption-segment{font:italic 600 24px/32px Georgia,serif;color:rgb(195,227,242);background:rgba(15,20,25,.72);text-shadow:1px 1px 2px black}
+ytd-comment-view-model,ytd-expander,ytd-comment-renderer{display:block}.clip{overflow:hidden;max-height:20px}
+</style>
+<div id="movie_player" class="html5-video-player"><video muted preload="auto"></video>
+<div class="ytp-caption-window-container" hidden><span class="ytp-caption-segment">Native</span></div>
+<div class="ytp-right-controls"><div class="ytp-right-controls-left"><button class="ytp-button">Auto</button>
+<button class="ytp-subtitles-button ytp-button" aria-pressed="false">CC</button></div></div></div>
 <p id="paragraph">A <em>web paragraph</em> with a link.</p><textarea>Editable text</textarea>
+<ytd-comment-view-model id="comment"><div>Comment author</div><ytd-expander><div class="clip">
+<yt-attributed-string slot="content"><span>Useful <a id="mention" href="#speaker">@speaker</a>!<br>More text <img alt="🙂"></span></yt-attributed-string>
+</div><button>Read more</button></ytd-expander><button id="like">Like</button></ytd-comment-view-model>
+<div id="replies"></div>
 <script>(${installFixture.toString()})();</script>`;
 
 let hold = null, fail = false, trackReads = 0, transcriptReads = 0, panelReads = 0;
@@ -61,7 +82,12 @@ try {
   const options = await page(browser.origin + '/src/ui/options.html');
   const endpoint = 'http://127.0.0.1:' + server.address().port + '/v1';
   await until(() => evaluate(options.session, "document.getElementById('paragraph-enabled').checked"), 'migrated settings');
-  assert.equal(await evaluate(options.session, "document.getElementById('youtube-enabled').checked"), false);
+  assert.equal(await evaluate(options.session, "document.getElementById('youtube-enabled').checked"), true);
+  const legacy = await evaluate(options.session, `(async()=>{
+    await chrome.storage.local.set({translationSettings:{provider:'google',target:'zh-CN',youtubeEnabled:false}});
+    return chrome.runtime.sendMessage({target:'background',type:'translation-settings'});
+  })()`);
+  assert.equal(legacy.settings.youtubeEnabled, false);
   await evaluate(options.session, `(() => {
     const el = id => document.getElementById(id);
     el('provider').value = 'model'; el('provider').dispatchEvent(new Event('change'));
@@ -107,6 +133,22 @@ try {
   const waitLine = text => until(async () => (await line()) === text, text);
   const batches = () => requests.filter(request => request.rows);
   const seek = time => read('document.querySelector("video").currentTime = ' + time);
+  const point = async selector => read(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+  const click = async selector => {
+    const position = await point(selector);
+    for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, ...position, button: 'left', clickCount: 1 }, session);
+  };
+  const toggle = '.pdf-copy-caption-toggle', nativeCC = '.ytp-subtitles-button';
+  const overlayHidden = () => read("document.querySelector('[data-pdf-copy-translation=youtube]').hidden");
+  const pressed = selector => read(`document.querySelector(${JSON.stringify(selector)})?.getAttribute('aria-pressed')`);
+  await until(async () => await pressed(toggle) === 'true', 'translation on by default');
+  assert.ok(await read("document.querySelector('.ytp-right-controls-left').firstElementChild.matches('.pdf-copy-caption-toggle')"));
+  assert.equal(await pressed(nativeCC), 'false');
+  assert.equal(await overlayHidden(), true);
+  await delay(350);
+  assert.equal(trackReads, 0);
+  assert.equal(batches().length, 0);
+  await click(nativeCC);
   await until(async () => batches().length === 1 && (await row('.pdf-copy-notice span'))?.includes('正在预译'), 'pre-play batch');
   assert.equal(await read("document.querySelector('video').paused"), true);
   assert.equal(await row('.pdf-copy-original'), 'First en line 0.');
@@ -114,7 +156,6 @@ try {
   assert.equal(await read("getComputedStyle(document.querySelector('.ytp-caption-window-container')).visibility"), 'hidden');
   console.log('PASS: 45 seconds requested together at entry while paused, with original and loading status');
 
-  const point = async selector => read(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
   const key = (type, key, code, vk, modifiers = 0) => send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, modifiers }, session);
   const shift = async (combo = false) => {
     await key('keyDown', 'Shift', 'ShiftLeft', 16, 8);
@@ -133,6 +174,56 @@ try {
   release(); await waitLine('译 First en line 0.');
   console.log('PASS: bare Shift on nested text translates and collapses, editors and chords are ignored, subtitle request survives');
 
+  const hoverShift = async selector => {
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...await point(selector) }, session);
+    await shift();
+  };
+  const commentHost = '#comment > [data-pdf-copy-translation=paragraph]';
+  await hoverShift('#mention');
+  await until(() => read(`document.querySelector('${commentHost}')?.shadowRoot.textContent.includes('段落译文')`), 'whole comment outside clipped expander');
+  assert.equal(requests.at(-1).contents, 'Useful @speaker!\nMore text 🙂');
+  assert.equal(await read(`document.querySelector('${commentHost}').previousElementSibling.localName`), 'ytd-expander');
+  await read("document.querySelector('#like').textContent='Like 2'; document.querySelector('#replies').innerHTML='<ytd-comment-renderer><yt-formatted-string id=content-text>A <b>new reply</b>.</yt-formatted-string></ytd-comment-renderer>'");
+  await hoverShift('#replies b');
+  await until(() => read("document.querySelector('#replies [data-pdf-copy-translation]')?.shadowRoot.textContent.includes('段落译文')"), 'dynamically loaded reply');
+  assert.equal(requests.at(-1).contents, 'A new reply.');
+  await hoverShift('#replies b');
+  assert.equal(await read("!!document.querySelector('#replies [data-pdf-copy-translation]')"), false);
+  const beforeLike = requests.length;
+  await hoverShift('#like'); assert.equal(requests.length, beforeLike);
+  console.log('PASS: comments and replies translate individually, including inline mentions, line breaks and emoji');
+
+  const stylesMatch = () => read(`(() => {
+    const a=document.querySelector('.pdf-copy-original'), b=document.querySelector('.pdf-copy-translated'), n=document.querySelector('.ytp-caption-segment');
+    const sa=getComputedStyle(a), sb=getComputedStyle(b), sn=getComputedStyle(n);
+    return a.parentElement===b.parentElement && a.nextElementSibling===b && sa.color===sb.color && sb.color===sn.color &&
+      sa.font===sb.font && sb.fontSize===sn.fontSize && sb.fontFamily===sn.fontFamily && getComputedStyle(a.parentElement).backgroundColor===sn.backgroundColor;
+  })()`);
+  await until(stylesMatch, 'native font, colors and shared caption box');
+  await read("document.querySelector('.ytp-caption-segment').style.cssText='font-size:29px;color:orange;'");
+  await until(stylesMatch, 'native caption style changes');
+  await read("const bar=document.querySelector('.ytp-right-controls'); bar.replaceWith(bar.cloneNode(true))");
+  await delay(350);
+  assert.equal(await read("document.querySelectorAll('.pdf-copy-caption-toggle').length"), 1);
+  await click(toggle); await until(overlayHidden, 'translation off');
+  assert.equal(await pressed(nativeCC), 'true');
+  assert.equal(await pressed(toggle), 'false');
+  assert.equal(await read("getComputedStyle(document.querySelector('.ytp-caption-window-container')).visibility"), 'visible');
+  await until(() => evaluate(options.session, "!document.getElementById('youtube-enabled').checked"), 'toolbar updates open settings');
+  assert.ok(await read(`!!document.querySelector('${commentHost}')`));
+  await key('keyDown', 'c', 'KeyC', 67); await key('keyUp', 'c', 'KeyC', 67);
+  assert.equal(await pressed(nativeCC), 'false');
+  await click(toggle); await until(async () => await pressed(toggle) === 'true', 'toggle on with CC off');
+  assert.equal(await pressed(nativeCC), 'false');
+  await seek(100); await delay(400);
+  assert.equal(await overlayHidden(), true);
+  assert.equal(batches().length, 1);
+  await seek(0); await click(nativeCC); await waitLine('译 First en line 0.');
+  assert.equal(batches().length, 1);
+  await read("document.querySelector('#comment [slot=content]').textContent='A recycled comment.'");
+  await until(() => read(`!document.querySelector('${commentHost}')`), 'recycled comment removes stale translation');
+  console.log('PASS: independent CC and translation controls, native C shortcut, cached resume, and matching typography');
+
   await seek(2.7); await waitLine('');
   await seek(6.2); await waitLine('译 First en line 2.');
   assert.equal(batches().length, 1);
@@ -143,13 +234,20 @@ try {
   await seek(46);
   assert.equal(await row('.pdf-copy-original'), 'First en line 15.');
   fail = false;
-  const button = await point('.pdf-copy-notice button');
-  for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, ...button, button: 'left', clickCount: 1 }, session);
+  await click('.pdf-copy-notice button');
   await waitLine('译 First en line 15.');
   console.log('PASS: silent gaps, cached seek, advance prefetch, error and retry use the right original');
 
   block(); const beforeSeek = batches().length;
   await seek(120); await until(() => batches().length > beforeSeek, 'distant seek batch');
+  assert.equal(batches().at(-1).rows[0].text, 'First en line 40.');
+  await click(nativeCC); await until(overlayHidden, 'CC off cancels pending translation');
+  release(); await delay(250);
+  assert.equal(await overlayHidden(), true);
+  assert.equal(await line(), '');
+  const beforeResume = batches().length;
+  block(); await click(nativeCC);
+  await until(() => batches().length > beforeResume, 'CC on resumes at current time');
   assert.equal(batches().at(-1).rows[0].text, 'First en line 40.');
   await read(`changeVideo(${JSON.stringify(secondVideo)})`);
   await until(() => batches().at(-1).rows[0].text === 'Next en line 0.', 'SPA replacement pre-play batch');
@@ -170,13 +268,20 @@ try {
   await waitLine('译 Modern transcript.');
   await seek(5.3); await waitLine('译 Second sentence.');
   assert.equal(panelReads, 1);
+  await read("window.cc=document.querySelector('.ytp-subtitles-button'); cc.remove(); window.apiCC=false; document.querySelector('#movie_player').isSubtitlesOn=()=>window.apiCC; window.dispatchEvent(new Event('yt-page-data-updated'))");
+  await until(overlayHidden, 'player API reports CC off without a native button');
+  await read("window.apiCC=true; window.dispatchEvent(new Event('yt-page-data-updated'))");
+  await waitLine('译 Second sentence.');
   const beforeMissing = requests.length;
   await read("changeVideo('eeeeeeeeee5')");
   await until(async () => (await row('.pdf-copy-notice span'))?.includes('未提供'), 'no captions hint');
   assert.equal(requests.length, beforeMissing);
   await evaluate(options.session, "document.getElementById('youtube-enabled').checked=false; document.querySelector('#settings-form button[type=submit]').click()");
-  await until(() => read("!document.querySelector('[data-pdf-copy-translation=youtube]')"), 'disabled on open tab');
+  await until(overlayHidden, 'disabled on open tab');
+  assert.equal(await pressed(toggle), 'false');
   assert.equal(await read("getComputedStyle(document.querySelector('.ytp-caption-window-container')).visibility"), 'visible');
+  await send('Page.reload', {}, session);
+  await until(async () => await pressed(toggle) === 'false', 'saved off preference survives reload, toggle still available');
   assert.deepEqual(errors, []);
   assert.deepEqual(browser.events.filter(event => event.method === 'Runtime.exceptionThrown'), []);
   console.log('PASS: both transcript formats, missing captions and disabling on the open page');

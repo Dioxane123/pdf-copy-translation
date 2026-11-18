@@ -9,10 +9,10 @@ const { sentences, cueAtOrAfter, nextBatch } = runInThisContext(source + '\nyout
 const event = (tStartMs, dDurationMs, text) => ({ tStartMs, dDurationMs, segs: [{ utf8: text }] });
 const json = data => new Response(JSON.stringify(data));
 
-test('existing PDF settings survive and automatic YouTube requests are opt-in', () => {
+test('a missing YouTube preference defaults on and a saved off preference survives', () => {
   const legacy = validateSettings({ enabled: true, provider: 'google', target: 'ja' });
-  assert.deepEqual([legacy.enabled, legacy.paragraphEnabled, legacy.youtubeEnabled, legacy.target], [true, true, false, 'ja']);
-  assert.equal(validateSettings({ ...legacy, enabled: false, youtubeEnabled: true }).youtubeEnabled, true);
+  assert.deepEqual([legacy.enabled, legacy.paragraphEnabled, legacy.youtubeEnabled, legacy.target], [true, true, true, 'ja']);
+  assert.equal(validateSettings({ ...legacy, youtubeEnabled: false }).youtubeEnabled, false);
 });
 
 test('sentences span caption rows, split within rows and retain ASR word timestamps', () => {
