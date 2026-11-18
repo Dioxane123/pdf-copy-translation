@@ -26,7 +26,7 @@ const browser = await launchBrowser();
 const { evaluate, send, page, shortcut, origin } = browser;
 const localPdf = '/tmp/pdf-translation-smoke.pdf';
 try {
-  const options = await page(`${origin}/options.html`);
+  const options = await page(`${origin}/src/ui/options.html`);
   await until(() => evaluate(options.session, "document.getElementById('provider').value === 'google'"), 'settings ready');
   await evaluate(options.session, `(() => {
     document.getElementById('translation-enabled').checked = true;
@@ -132,7 +132,7 @@ try {
 
   // Screenshot contains only generated sample text and simulated translations.
   const screenshot = await send('Page.captureScreenshot', { format: 'png' }, reader.session);
-  await writeFile(new URL('../reader-preview.png', import.meta.url), Buffer.from(screenshot.data, 'base64'));
+  await writeFile(new URL('../docs/images/reader-preview.png', import.meta.url), Buffer.from(screenshot.data, 'base64'));
   await writeFile(localPdf, makePdf());
   const dom = await send('DOM.getDocument', {}, reader.session);
   const fileInput = await send('DOM.querySelector', { nodeId: dom.root.nodeId, selector: '#fileInput' }, reader.session);

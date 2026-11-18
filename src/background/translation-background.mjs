@@ -1,11 +1,13 @@
-import { encryptApiKey, decryptApiKey } from './crypto.mjs';
-import { DEFAULT_TRANSLATION, normalizeEndpoint, translateCaptions, translateText, validateSettings } from './translation.mjs';
-import { normalizeModelSettings } from './model-presets.mjs';
+import { encryptApiKey, decryptApiKey } from '../translation/crypto.mjs';
+import { DEFAULT_TRANSLATION, normalizeEndpoint, translateCaptions, translateText, validateSettings } from '../translation/translation.mjs';
+import { normalizeModelSettings } from '../translation/model-presets.mjs';
 
 const pending = new Map();
 const settingsKey = 'translationSettings';
 const vaultKey = 'translationVault';
 const sessionKey = 'translationUnlocked';
+const { options_ui, action } = chrome.runtime.getManifest();
+const optionsPage = options_ui.page;
 
 function extensionPage(sender, paths) {
   return sender.id === chrome.runtime.id && paths.some((path) => sender.url?.split(/[?#]/)[0] === chrome.runtime.getURL(path));
@@ -41,9 +43,9 @@ export async function handleTranslationMessage(message, sender) {
   if (webpage && message.type === 'translation-page-options') {
     return pageOptions((await chrome.storage.local.get(settingsKey))[settingsKey]);
   }
-  if (message.type === 'translation-settings' && (reader || extensionPage(sender, ['options.html', 'popup.html']))) return publicSettings();
+  if (message.type === 'translation-settings' && (reader || extensionPage(sender, [optionsPage, action.default_popup]))) return publicSettings();
   if (message.type === 'translation-save') {
-    if (!extensionPage(sender, ['options.html'])) throw new Error('请在设置页面操作。');
+    if (!extensionPage(sender, [optionsPage])) throw new Error('请在设置页面操作。');
     const settings = validateSettings(message.settings);
     const old = await chrome.storage.local.get(vaultKey);
     let vault = old[vaultKey];
@@ -63,7 +65,7 @@ export async function handleTranslationMessage(message, sender) {
     return notifyPages();
   }
   if (message.type === 'translation-unlock') {
-    if (!extensionPage(sender, ['options.html'])) throw new Error('请在设置页面解锁。');
+    if (!extensionPage(sender, [optionsPage])) throw new Error('请在设置页面解锁。');
     const stored = await chrome.storage.local.get([settingsKey, vaultKey]);
     const endpoint = normalizeEndpoint(stored[settingsKey]?.baseUrl || '');
     const apiKey = await decryptApiKey(stored[vaultKey], message.password, endpoint);
@@ -72,7 +74,7 @@ export async function handleTranslationMessage(message, sender) {
     return notifyPages();
   }
   if (message.type === 'translation-lock' || message.type === 'translation-delete-key') {
-    if (!extensionPage(sender, ['options.html'])) throw new Error('请在设置页面操作。');
+    if (!extensionPage(sender, [optionsPage])) throw new Error('请在设置页面操作。');
     cancelAll();
     await chrome.storage.session.remove(sessionKey);
     if (message.type === 'translation-delete-key') await chrome.storage.local.remove(vaultKey);

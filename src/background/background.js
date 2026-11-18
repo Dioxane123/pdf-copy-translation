@@ -1,11 +1,11 @@
-import { canMarkTab, documentUrl, isPdfTab } from "./core.mjs";
+import { canMarkTab, documentUrl, isPdfTab } from "../pdf/core.mjs";
 import { handleTranslationMessage } from './translation-background.mjs';
 
 // Keep configuration and decrypted session credentials out of content-script contexts.
 void chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
 void chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
 
-const OFFSCREEN = "offscreen.html";
+const OFFSCREEN = "src/background/offscreen.html";
 const PREFIX = "pdf-tab:";
 let enabled = true;
 let generation = 0;
@@ -126,7 +126,7 @@ async function handleMessage(message, sender) {
   if (message.type?.startsWith('translation-')) return handleTranslationMessage(message, sender);
   if (!sender.url?.startsWith(chrome.runtime.getURL(''))) throw new Error('此操作仅供扩展页面使用。');
   if (message.type === 'open-reader') {
-    if (sender.url?.split(/[?#]/)[0] !== chrome.runtime.getURL('popup.html')) throw new Error('请通过扩展面板打开。');
+    if (sender.url?.split(/[?#]/)[0] !== chrome.runtime.getURL(chrome.runtime.getManifest().action.default_popup)) throw new Error('请通过扩展面板打开。');
     const tab = await activeTab();
     const viewer = new URL(chrome.runtime.getURL('pdfjs/web/viewer.html'));
     if (tab?.url?.startsWith(viewer.href)) return { ok: true };

@@ -7,9 +7,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { replaceLineBreaksWithSpaces } from "../core.mjs";
+import { replaceLineBreaksWithSpaces } from "../src/pdf/core.mjs";
 
-const root = fileURLToPath(new URL("../", import.meta.url));
+const root = process.env.EXTENSION_DIR || fileURLToPath(new URL("../", import.meta.url));
 const profile = await mkdtemp(join(tmpdir(), "pdf-cleaner-test-"));
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label, timeout = 15000) {
@@ -97,8 +97,8 @@ try {
     return null;
   }, "extension load");
   console.log("Extension loaded");
-  const extensionOrigin = worker.url.slice(0, worker.url.lastIndexOf("/"));
-  const control = await send("Target.createTarget", { url: `${extensionOrigin}/popup.html` });
+  const extensionOrigin = new URL("/", worker.url).href.slice(0, -1);
+  const control = await send("Target.createTarget", { url: `${extensionOrigin}/src/ui/popup.html` });
   const controlSession = await attach(control.targetId);
   await until(() => evaluate(controlSession, "typeof chrome?.storage?.local === 'object'").catch(() => false), "control page");
   const status = () => evaluate(controlSession, "chrome.runtime.sendMessage({target:'background',type:'status'})");

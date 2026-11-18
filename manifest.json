@@ -1,27 +1,27 @@
 {
   "manifest_version": 3,
   "name": "PDF 复制换行转空格",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "PDF 复制换行处理与翻译浮窗、Shift 网页段落翻译、YouTube 双语字幕预译。共用谷歌翻译或自定义模型。",
   "minimum_chrome_version": "116",
   "permissions": ["tabs", "storage", "offscreen", "clipboardRead", "clipboardWrite", "webRequest"],
   "host_permissions": ["http://*/*", "https://*/*", "file:///*"],
-  "background": { "service_worker": "background.js", "type": "module" },
+  "background": { "service_worker": "src/background/background.js", "type": "module" },
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*", "file:///*"],
-      "js": ["web-content.js"], "run_at": "document_start", "all_frames": true
+      "js": ["src/web/web-content.js"], "run_at": "document_start", "all_frames": true
     },
     {
       "matches": ["https://www.youtube.com/*", "https://youtube.com/*", "https://m.youtube.com/*", "https://www.youtube-nocookie.com/embed/*"],
-      "js": ["youtube-player.js"], "world": "MAIN", "run_at": "document_start", "all_frames": true
+      "js": ["src/youtube/youtube-player.js"], "world": "MAIN", "run_at": "document_start", "all_frames": true
     },
     {
       "matches": ["https://www.youtube.com/*", "https://youtube.com/*", "https://m.youtube.com/*", "https://www.youtube-nocookie.com/embed/*"],
-      "js": ["youtube-captions.js", "youtube-source.js", "youtube.js"], "css": ["youtube.css"], "run_at": "document_end", "all_frames": true
+      "js": ["src/youtube/youtube-captions.js", "src/youtube/youtube-source.js", "src/youtube/youtube.js"], "css": ["src/youtube/youtube.css"], "run_at": "document_end", "all_frames": true
     }
   ],
-  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "options_ui": { "page": "src/ui/options.html", "open_in_tab": true },
   "content_security_policy": { "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
-  "action": { "default_title": "PDF 复制换行转空格", "default_popup": "popup.html" }
+  "action": { "default_title": "PDF 复制换行转空格", "default_popup": "src/ui/popup.html" }
 }

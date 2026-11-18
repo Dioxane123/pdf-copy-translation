@@ -1,19 +1,19 @@
-# PDF 复制助手 · v1.3.0
+# PDF 复制助手 · v1.3.1
 
-桌面版 Chrome / Edge 扩展。支持 PDF 复制换行处理与翻译浮窗、Shift 网页段落翻译、YouTube 双语字幕。可直接加载源码目录使用。
+桌面版 Chrome / Edge 扩展。支持 PDF 复制换行处理与翻译浮窗、Shift 网页段落翻译、YouTube 双语字幕。
 
-[下载当前源码](https://github.com/Dioxane123/pdf-copy-translation/archive/refs/heads/main.zip) · [已发布的安装包](https://github.com/Dioxane123/pdf-copy-translation/releases) · [反馈问题](https://github.com/Dioxane123/pdf-copy-translation/issues)
+[下载最新版（GitHub Release）](https://github.com/Dioxane123/pdf-copy-translation/releases/latest) · [历史版本](https://github.com/Dioxane123/pdf-copy-translation/releases) · [反馈问题](https://github.com/Dioxane123/pdf-copy-translation/issues)
 
-![PDF 阅读模式中的复制翻译浮窗](reader-preview.png)
+![PDF 阅读模式中的复制翻译浮窗](https://raw.githubusercontent.com/Dioxane123/pdf-copy-translation/main/docs/images/reader-preview.png)
 
 预览使用生成的测试文档和模拟译文，只演示界面与交互。
 
 ## 安装或更新
 
-1. 将当前源码或安装 ZIP 解压到固定目录。
+1. 从最新版 GitHub Release 的 **Assets** 下载 `pdf-copy-cleaner-版本号.zip`，将其中的 `pdf-copy-cleaner` 文件夹解压到固定位置。同页提供 SHA-256 校验文件。
 2. 打开 `chrome://extensions/` 或 `edge://extensions/`，开启「开发者模式」。
 3. 点击「加载已解压的扩展程序」，选择包含 `manifest.json` 的目录。
-4. 更新时用新版文件覆盖**原目录**，在扩展管理页点击「重新加载」，再刷新已打开的网页、YouTube 和 PDF 标签页。这样可保留现有翻译配置和加密密钥。
+4. 更新时，用解压出来的完整文件夹替换原安装文件夹，保持**原来的绝对路径**。在扩展管理页点击「重新加载」，再刷新已打开的网页、YouTube 和 PDF 标签页。这样可以清掉旧版文件，并保留翻译配置和加密密钥。
 5. 要从本地文件网址直接打开 PDF，在扩展详情开启「允许访问文件网址 / 文件 URL」。也可在阅读模式中点击「打开本地 PDF」，该文件选择方式无需此权限。
 
 请使用当前桌面版 Chrome / Edge。原有剪贴板功能最低需要 Chrome 116 级别的 API；新增阅读模式捆绑 PDF.js 6.4.299 的现代构建，面向最新浏览器，不保证旧版浏览器可运行。
@@ -98,7 +98,7 @@
 - 「查看将发送的额外参数」仅显示参数 JSON，不包含密钥或原文。切换模板不发送另一模板的字段；两套设置分别记忆。
 - 直接使用 HTTP JSON 时，DeepSeek 的 `thinking` 位于请求顶层，不嵌套进 SDK 专用的 `extra_body`。
 
-参数依据、型号差异和官方来源见 [MODEL_PRESETS.md](MODEL_PRESETS.md)（核对日期：2026-10-23）。
+参数依据、型号差异和官方来源见[模型预设说明](docs/MODEL_PRESETS.md)（核对日期：2026-10-23）。
 
 ## API_KEY 的保护方式
 
@@ -159,32 +159,26 @@ PDF 翻译发送本次复制的文字，网页翻译发送用 Shift 指定的段
 - `CHROME_BIN=/path/to/chrome node tests/reader-smoke.mjs`：扩展阅读模式与浮窗集成检查，使用本机模拟模型服务、虚拟密钥和生成的 PDF，覆盖真实复制、取消选中、保留浮窗、复制译文、快速连续复制、取消请求、重试、锁定解锁和本地文件。
 - `CHROME_BIN=/path/to/chrome node tests/presets-smoke.mjs`：在 Chrome 中保存预设并实际复制 PDF，检查本机模拟中转服务收到的参数、切换预设、设置持久化、密钥保护与 33 秒慢响应。
 - `CHROME_BIN=/path/to/chrome node tests/render-smoke.mjs /path/to/document.pdf`：检查无 WebGPU 探测及适配器警告、PDF 渲染、文字层和复制换行处理；省略文件路径时使用生成的测试 PDF。
-- `python3 package.py --output-dir dist`：生成安装 ZIP 和 SHA-256 校验文件。安装包不包含截图、测试脚本、Git 数据或发布工具；这些文件保留在源码仓库中。
+- `python3 scripts/package.py` 在 `dist/` 中生成安装 ZIP 和 SHA-256 校验文件，并检查包内的扩展入口。
 
 集成测试使用 Node.js 22+ 和独立的 Chrome for Testing 配置。v1.3.0 在 Linux 的 Chrome for Testing 158.0.8127.36 中验证了 PDF、网页段落和双语字幕。在真实视频页面暂停于 0 秒时，扩展使用页面文字稿一次提交了 11 句字幕，定位到第 12 秒时显示对应的谷歌中文译文。模型测试使用本机模拟服务。 [实测公开视频](https://www.youtube.com/watch?v=M7lc1UVf-VE)
 
 v1.2.1 使用 arXiv `2605.00080` 的公开 PDF 复现了适配器警告（文档指纹 `712b8842c92b22aff711834cd5ee7579`、43 页）；该文件下载后由本机测试服务提供，验证首屏渲染、文字选择和复制。未逐页检查全部 43 页。
 
-第三方依赖及版本、许可证见 `THIRD_PARTY_NOTICES.md`。预览截图中的译文由模拟服务生成，仅演示界面和交互。
+预览截图中的译文由模拟服务生成。第三方依赖、版本和许可证见[第三方组件说明](docs/THIRD_PARTY_NOTICES.md)。
 
-## 从 GitHub 获取和发布
+## 项目结构与发布
 
-个人使用可以直接下载 [Releases](https://github.com/Dioxane123/pdf-copy-translation/releases) 中的安装 ZIP；也可以克隆源码，并在扩展管理页加载仓库根目录。安装后不要移动该目录。源码方式更新后需要重新加载扩展和刷新 PDF 页面。
+开发时可直接在浏览器加载仓库根目录，入口为 `manifest.json`。
 
-```sh
-git clone git@github.com:Dioxane123/pdf-copy-translation.git
-cd pdf-copy-translation
-```
+| 目录 | 内容 |
+| --- | --- |
+| `src/` | 后台与剪贴板、PDF 阅读模式、翻译服务、设置与弹窗、网页段落、YouTube 字幕 |
+| `pdfjs/` | 随扩展打包的 PDF.js 和阅读器资源 |
+| `docs/` | 模型预设、第三方声明、截图和各版本发布说明 |
+| `scripts/` | 安装包构建工具 |
+| `tests/` | 逻辑测试和 Chrome 集成测试 |
 
-仓库仅保存程序代码与文档，不包含用户配置或真实 API_KEY。浏览器中已经保存的设置不在源码目录中。
-
-维护者发布新版时：修改 `manifest.json` 的版本号，更新文档并增加 `docs/releases/v版本号.md`，提交并推送到 `main`，然后创建和推送相同版本标签。GitHub Actions 会先运行逻辑测试，再构建并发布 ZIP 和校验文件。标签版本必须与 manifest 一致。工作流使用 GitHub 自带的临时授权，不需要在仓库中配置个人 Token。
-
-```sh
-# 示例：完成 v1.2.2 的代码、版本号及发布说明后
-git tag -a v1.2.2 -m "Release v1.2.2"
-git push origin main
-git push origin v1.2.2
-```
+正式版本统一发布到 [GitHub Releases](https://github.com/Dioxane123/pdf-copy-translation/releases)。维护者更新 `manifest.json` 的版本号，并添加对应的 `docs/releases/v版本号.md`。改动进入 `main` 后，GitHub Actions 会执行测试，从通过检查的提交创建版本标签，把安装 ZIP 和 SHA-256 校验文件上传后公开 Release。手动推送对应版本标签也可触发同一流程。
 
 参考：[Mozilla PDF.js](https://mozilla.github.io/pdf.js/getting_started/)、[PDF.js 浏览器兼容说明](https://github.com/mozilla/pdf.js/wiki/Frequently-Asked-Questions#which-browsersenvironments-are-supported)、[Chrome Offscreen API](https://developer.chrome.com/docs/extensions/reference/api/offscreen)、[Edge 扩展 API](https://learn.microsoft.com/en-us/microsoft-edge/extensions/developer-guide/api-support)。

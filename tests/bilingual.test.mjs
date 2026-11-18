@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { runInThisContext } from 'node:vm';
-import { DEFAULT_TRANSLATION, translateCaptions, validateSettings } from '../translation.mjs';
+import { DEFAULT_TRANSLATION, translateCaptions, validateSettings } from '../src/translation/translation.mjs';
 
-const source = readFileSync(new URL('../youtube-captions.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/youtube/youtube-captions.js', import.meta.url), 'utf8');
 const { sentences, cueAtOrAfter, nextBatch } = runInThisContext(source + '\nyoutubeCaptions');
 const event = (tStartMs, dDurationMs, text) => ({ tStartMs, dDurationMs, segs: [{ utf8: text }] });
 const json = data => new Response(JSON.stringify(data));

@@ -1,4 +1,4 @@
-import { ClipboardCleaner } from "./core.mjs";
+import { ClipboardCleaner } from "../pdf/core.mjs";
 
 const field = document.getElementById("clipboard");
 

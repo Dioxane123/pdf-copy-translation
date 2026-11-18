@@ -21,7 +21,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await launchBrowser();
 const { page, send, evaluate, shortcut, origin } = browser;
 try {
-  const options = await page(`${origin}/options.html`);
+  const options = await page(`${origin}/src/ui/options.html`);
   const set = async (id, value) => evaluate(options.session, `(() => {
     const field = document.getElementById(${JSON.stringify(id)});
     ${typeof value === 'boolean' ? `field.checked = ${value}` : `field.value = ${JSON.stringify(value)}`};
@@ -110,7 +110,7 @@ try {
   await set('gpt-effort', 'low'); await save();
   await evaluate(options.session, "document.getElementById('model-preset').scrollIntoView(); document.getElementById('parameter-preview').open=true");
   const shot = await send('Page.captureScreenshot', { format: 'png' }, options.session);
-  await writeFile(new URL('../presets-preview.png', import.meta.url), Buffer.from(shot.data, 'base64'));
+  await writeFile(new URL('../docs/images/presets-preview.png', import.meta.url), Buffer.from(shot.data, 'base64'));
   console.log('PASS: invalid known-model effort is explained and rejected before saving');
 
   responseDelay = 33000;

@@ -1,4 +1,4 @@
-import { applyModelPreset, buildModelParameters, gptCapabilities, normalizeModelSettings } from './model-presets.mjs';
+import { applyModelPreset, buildModelParameters, gptCapabilities, normalizeModelSettings } from '../translation/model-presets.mjs';
 
 const $ = (id) => document.getElementById(id);
 let current;

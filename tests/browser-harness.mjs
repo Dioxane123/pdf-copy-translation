@@ -90,7 +90,7 @@ export async function launchBrowser() {
         if (name === 'PDF 复制换行转空格') return target;
       }
     }, 'extension');
-    const origin = worker.url.slice(0, worker.url.lastIndexOf('/'));
+    const origin = new URL('/', worker.url).href.slice(0, -1);
     const page = async url => {
       const target = await send('Target.createTarget', { url });
       const session = await attach(target.targetId);

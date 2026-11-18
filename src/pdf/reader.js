@@ -1,5 +1,5 @@
 import { replaceLineBreaksWithSpaces } from './core.mjs';
-import { DEFAULT_TRANSLATION, TARGETS, MAX_TEXT_LENGTH } from './translation.mjs';
+import { DEFAULT_TRANSLATION, TARGETS, MAX_TEXT_LENGTH } from '../translation/translation.mjs';
 
 export async function startReader(app) {
   await app.initializedPromise;

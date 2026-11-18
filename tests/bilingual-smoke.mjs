@@ -58,7 +58,7 @@ const { send, evaluate, page } = browser;
 let release;
 function block() { hold = new Promise(resolve => { release = () => { hold = null; resolve(); }; }); }
 try {
-  const options = await page(browser.origin + '/options.html');
+  const options = await page(browser.origin + '/src/ui/options.html');
   const endpoint = 'http://127.0.0.1:' + server.address().port + '/v1';
   await until(() => evaluate(options.session, "document.getElementById('paragraph-enabled').checked"), 'migrated settings');
   assert.equal(await evaluate(options.session, "document.getElementById('youtube-enabled').checked"), false);

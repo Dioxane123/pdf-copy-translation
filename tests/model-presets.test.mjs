@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyModelPreset, buildModelParameters, gptCapabilities, normalizeModelSettings } from '../model-presets.mjs';
-import { validateSettings, translateText } from '../translation.mjs';
+import { applyModelPreset, buildModelParameters, gptCapabilities, normalizeModelSettings } from '../src/translation/model-presets.mjs';
+import { validateSettings, translateText } from '../src/translation/translation.mjs';
 
 const modelSettings = (extra = {}) => ({ enabled: true, provider: 'model', target: 'zh-CN', baseUrl: 'https://proxy.example.org/custom/v1', model: 'proxy-model-alias', ...extra });
 

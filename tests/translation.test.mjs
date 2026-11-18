@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { encryptApiKey, decryptApiKey } from '../crypto.mjs';
-import { normalizeEndpoint, translateText, validateSettings, DEFAULT_TRANSLATION } from '../translation.mjs';
+import { encryptApiKey, decryptApiKey } from '../src/translation/crypto.mjs';
+import { normalizeEndpoint, translateText, validateSettings, DEFAULT_TRANSLATION } from '../src/translation/translation.mjs';
 
 test('encrypted keys decrypt only with the correct password and endpoint', async () => {
   const endpoint = 'https://example.org/v1/chat/completions';

@@ -6,24 +6,28 @@ import shutil
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
-root = Path(__file__).resolve().parent
+root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--output-dir", type=Path, default=root.parent)
+parser.add_argument("--output-dir", type=Path, default=root / "dist")
 args = parser.parse_args()
 output = args.output_dir.resolve()
 output.mkdir(parents=True, exist_ok=True)
-version = json.loads((root / "manifest.json").read_text())["version"]
+manifest = json.loads((root / "manifest.json").read_text())
+version = manifest["version"]
 archive = output / f"pdf-copy-cleaner-{version}.zip"
 # Keep the install directory stable even when GitHub clones the repository as
 # pdf-copy-translation, or a user checks out the source under another name.
 archive_root = Path("pdf-copy-cleaner")
 runtime_names = [
-    "manifest.json", "background.js", "core.mjs", "crypto.mjs", "model-presets.mjs",
-    "offscreen.html", "offscreen.js", "options.html", "options.css", "options.js",
-    "popup.html", "popup.css", "popup.js", "reader-bootstrap.js", "reader.css",
-    "reader.js", "translation-background.mjs", "translation.mjs",
-    "web-content.js", "youtube-player.js", "youtube-captions.js", "youtube-source.js", "youtube.js", "youtube.css",
-    "README.md", "MODEL_PRESETS.md", "THIRD_PARTY_NOTICES.md",
+    "manifest.json", "README.md", "docs/MODEL_PRESETS.md", "docs/THIRD_PARTY_NOTICES.md",
+    "src/background/background.js", "src/background/translation-background.mjs",
+    "src/background/offscreen.html", "src/background/offscreen.js",
+    "src/pdf/core.mjs", "src/pdf/reader-bootstrap.js", "src/pdf/reader.css", "src/pdf/reader.js",
+    "src/translation/crypto.mjs", "src/translation/model-presets.mjs", "src/translation/translation.mjs",
+    "src/ui/options.html", "src/ui/options.css", "src/ui/options.js",
+    "src/ui/popup.html", "src/ui/popup.css", "src/ui/popup.js",
+    "src/web/web-content.js", "src/youtube/youtube-player.js", "src/youtube/youtube-captions.js",
+    "src/youtube/youtube-source.js", "src/youtube/youtube.js", "src/youtube/youtube.css",
 ]
 files = [root / name for name in runtime_names]
 for path in files:
@@ -41,8 +45,14 @@ with ZipFile(archive, "w", ZIP_DEFLATED, compresslevel=9) as z:
         z.writestr(info, path.read_bytes(), compress_type=ZIP_DEFLATED, compresslevel=9)
 with ZipFile(archive) as z:
     assert z.testzip() is None
-    assert json.loads(z.read("pdf-copy-cleaner/manifest.json"))["version"] == version
-    assert "pdf-copy-cleaner/pdfjs/LICENSE" in z.namelist()
+    assert json.loads(z.read((archive_root / "manifest.json").as_posix())) == manifest
+    entry_points = [manifest["background"]["service_worker"], manifest["action"]["default_popup"],
+                    manifest["options_ui"]["page"], "pdfjs/web/viewer.html", "pdfjs/LICENSE"]
+    for script in manifest["content_scripts"]:
+        entry_points.extend(script.get("js", []))
+        entry_points.extend(script.get("css", []))
+    for name in entry_points:
+        z.getinfo((archive_root / name).as_posix())
 digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 archive.with_suffix(".zip.sha256").write_text(f"{digest}  {archive.name}\n")
 shutil.copyfile(archive, output / "pdf-copy-cleaner.zip")

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { replaceLineBreaksWithSpaces, isPdfUrl, isPdfTab, documentUrl, ClipboardCleaner } from "../core.mjs";
+import { replaceLineBreaksWithSpaces, isPdfUrl, isPdfTab, documentUrl, ClipboardCleaner } from "../src/pdf/core.mjs";
 
 function fixture() {
   const state = { context: { key: "pdf-1" }, text: "旧\n剪贴板", reads: 0, writes: [] };
