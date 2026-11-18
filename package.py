@@ -22,6 +22,7 @@ runtime_names = [
     "offscreen.html", "offscreen.js", "options.html", "options.css", "options.js",
     "popup.html", "popup.css", "popup.js", "reader-bootstrap.js", "reader.css",
     "reader.js", "translation-background.mjs", "translation.mjs",
+    "web-content.js", "youtube-player.js", "youtube-captions.js", "youtube-source.js", "youtube.js", "youtube.css",
     "README.md", "MODEL_PRESETS.md", "THIRD_PARTY_NOTICES.md",
 ]
 files = [root / name for name in runtime_names]

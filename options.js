@@ -59,6 +59,8 @@ function showVault() {
 }
 function fill() {
   $('translation-enabled').checked = current.settings.enabled;
+  $('paragraph-enabled').checked = current.settings.paragraphEnabled;
+  $('youtube-enabled').checked = current.settings.youtubeEnabled;
   $('provider').value = current.settings.provider;
   $('target').value = current.settings.target;
   $('base-url').value = current.settings.baseUrl;
@@ -96,15 +98,16 @@ $('settings-form').addEventListener('submit', (event) => {
   const button = event.submitter; button.disabled = true;
   void action(async () => {
     current = await send('translation-save', {
-      settings: { enabled: $('translation-enabled').checked, provider: $('provider').value, target: $('target').value, baseUrl: $('base-url').value, ...modelFields() },
+      settings: { enabled: $('translation-enabled').checked, paragraphEnabled: $('paragraph-enabled').checked,
+        youtubeEnabled: $('youtube-enabled').checked, provider: $('provider').value, target: $('target').value, baseUrl: $('base-url').value, ...modelFields() },
       apiKey: $('api-key').value, password: $('save-password').value,
     });
-    fill(); message('已保存。返回 PDF 阅读模式后立即生效。');
+    fill(); message('已保存，翻译设置已生效。');
   }).finally(() => { button.disabled = false; });
 });
 $('unlock-form').addEventListener('submit', (event) => {
   event.preventDefault(); $('unlock-button').disabled = true;
-  void action(async () => { current = await send('translation-unlock', { password: $('unlock-password').value }); showVault(); message('已解锁，可返回 PDF 继续翻译。'); }).finally(() => showVault());
+  void action(async () => { current = await send('translation-unlock', { password: $('unlock-password').value }); showVault(); message('已解锁，可继续翻译。'); }).finally(() => showVault());
 });
 $('lock').addEventListener('click', () => void action(async () => { current = await send('translation-lock'); showVault(); message('已锁定，内存中的密钥已清除。'); }));
 $('delete-key').addEventListener('click', () => void action(async () => {

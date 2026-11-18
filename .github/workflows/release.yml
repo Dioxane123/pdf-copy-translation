@@ -28,6 +28,7 @@ jobs:
           node tests/core.test.mjs
           node tests/translation.test.mjs
           node tests/model-presets.test.mjs
+          node tests/bilingual.test.mjs
       - name: Validate version and build ZIP
         env:
           RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
@@ -84,6 +85,7 @@ jobs:
           node tests/core.test.mjs
           node tests/translation.test.mjs
           node tests/model-presets.test.mjs
+          if [ -f tests/bilingual.test.mjs ]; then node tests/bilingual.test.mjs; fi
           python3 package.py --output-dir dist
           version="${RELEASE_TAG#v}"
           gh release create "$RELEASE_TAG" \

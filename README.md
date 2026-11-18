@@ -1,8 +1,8 @@
-# PDF 复制助手 · v1.2.1
+# PDF 复制助手 · v1.3.0
 
-桌面版 Chrome / Edge 扩展：复制 PDF 时将所有换行替换为空格，并提供复制翻译浮窗。无需 Node.js 或构建工具。
+桌面版 Chrome / Edge 扩展。支持 PDF 复制换行处理与翻译浮窗、Shift 网页段落翻译、YouTube 双语字幕。可直接加载源码目录使用。
 
-[下载最新版本](https://github.com/Dioxane123/pdf-copy-translation/releases/latest) · [v1.2.1 安装包](https://github.com/Dioxane123/pdf-copy-translation/releases/download/v1.2.1/pdf-copy-cleaner-1.2.1.zip) · [反馈问题](https://github.com/Dioxane123/pdf-copy-translation/issues)
+[下载当前源码](https://github.com/Dioxane123/pdf-copy-translation/archive/refs/heads/main.zip) · [已发布的安装包](https://github.com/Dioxane123/pdf-copy-translation/releases) · [反馈问题](https://github.com/Dioxane123/pdf-copy-translation/issues)
 
 ![PDF 阅读模式中的复制翻译浮窗](reader-preview.png)
 
@@ -10,10 +10,10 @@
 
 ## 安装或更新
 
-1. 解压 `pdf-copy-cleaner-1.2.1.zip` 到固定目录。
+1. 将当前源码或安装 ZIP 解压到固定目录。
 2. 打开 `chrome://extensions/` 或 `edge://extensions/`，开启「开发者模式」。
-3. 点击「加载已解压的扩展程序」，选择包含 `manifest.json` 的 `pdf-copy-cleaner` 目录。
-4. 若已安装旧版：用新版文件覆盖**原目录**，在扩展管理页点击「重新加载」，刷新已打开的 PDF 和阅读模式标签页。不必卸载旧版，设置会保留。
+3. 点击「加载已解压的扩展程序」，选择包含 `manifest.json` 的目录。
+4. 更新时用新版文件覆盖**原目录**，在扩展管理页点击「重新加载」，再刷新已打开的网页、YouTube 和 PDF 标签页。这样可保留现有翻译配置和加密密钥。
 5. 要从本地文件网址直接打开 PDF，在扩展详情开启「允许访问文件网址 / 文件 URL」。也可在阅读模式中点击「打开本地 PDF」，该文件选择方式无需此权限。
 
 请使用当前桌面版 Chrome / Edge。原有剪贴板功能最低需要 Chrome 116 级别的 API；新增阅读模式捆绑 PDF.js 6.4.299 的现代构建，面向最新浏览器，不保证旧版浏览器可运行。
@@ -36,6 +36,18 @@
 - 翻译失败会显示错误及重试按钮。单次限 12,000 字符，默认 25 秒超时；模型翻译可将等待上限设为 10–180 秒。第三方服务可能有更低限制。
 
 当前内置 PDF 阅读器不向扩展可靠开放选区变化，所以**翻译浮窗仅在扩展 PDF 阅读模式中提供**。Chrome / Edge 自带阅读器继续支持原有的换行转空格功能。
+
+## 网页段落翻译
+
+将鼠标停在网页正文的一段上，单独按下并松开 **Shift**。译文会接在该段原文下方，再按一次可收起。翻译过程中会显示「正在翻译」，失败时可在同一处点击「重试」。输入框和编辑区保留原本的按键行为。此快捷键默认开启，可在「翻译设置」关闭。
+
+## YouTube 双语字幕
+
+1. 在「翻译设置」勾选 **自动翻译 YouTube 字幕** 并保存。该开关默认关闭。三种翻译功能共用服务、目标语言、模型参数和密钥解锁状态。
+2. 打开有字幕的 YouTube 视频。即使播放器暂停，扩展也会从当前进度开始，按约 **45 秒**视频内容一次请求多句译文。播放中会在缓存用完前预译下一批，拖动进度条会优先处理新位置。
+3. 播放器内上行是原文，下行是译文。扩展按标点、字幕停顿和词级时间戳整理人工字幕与自动字幕。只有整条字幕的时间戳时，句内切分按文字位置估算。翻译未完成时保留原文并提示进度，失败时显示原因，可点击「重试」。
+
+预译需要带时间轴的字幕或 YouTube 提供的文字稿。没有字幕的视频和没有未来字幕的直播会显示提示。已译字幕仅缓存在当前视频页面。使用付费模型时，预译的片段会产生服务商费用。
 
 ## 翻译服务
 
@@ -118,7 +130,7 @@ v1.2.1 关闭了 PDF.js 默认开启的可选 WebGPU 渲染路径，使用普通
 
 控制台中的 `PDF … [版本 / 生成工具] (PDF.js: …)` 是文档元数据日志，不是报错；它本身不证明所有页面或翻译请求都成功。如果仍有空白页或翻译异常，需要结合实际界面和其他错误定位。
 
-开启复制翻译后，只有本次复制的文字会发送给所选择的服务。扩展不保存原文或译文历史，不上传整份 PDF，不收集遥测。若使用第三方服务，其自身的数据处理规则适用。
+PDF 翻译发送本次复制的文字，网页翻译发送用 Shift 指定的段落。开启 YouTube 自动翻译后会从视频页读取字幕，按当前进度把一批字幕文字发送给同一服务。扩展不保存翻译历史。若使用第三方服务，其自身的数据处理规则适用。
 
 加密的 PDF 需输入文件密码；扫描件必须本来有可选文本层，此版本不提供 OCR。部分登录网站、临时 `blob:` 地址或嵌入页面无法重新读取，下载 PDF 后使用「打开本地 PDF」即可。与浏览器原生阅读器相比，个别 PDF 的渲染可能不同。
 
@@ -131,14 +143,16 @@ v1.2.1 关闭了 PDF.js 默认开启的可选 WebGPU 渲染路径，使用普通
 | `tabs` | 判断当前 PDF 并打开扩展阅读模式 |
 | `storage` | 设置、密钥密文、会话中的解锁状态 |
 | `webRequest` | 读取顶层响应 Content-Type 识别 PDF，不读取响应正文 |
-| HTTP/HTTPS 访问 | 读取原 PDF、访问用户选择的翻译端点 |
-| `file:///*` | 从本地 PDF 地址打开文件 |
+| HTTP/HTTPS 访问 | 读取原 PDF、响应网页 Shift 快捷键、读取 YouTube 字幕、访问用户选择的翻译端点 |
+| `file:///*` | 从本地地址打开 PDF，或在获准的本地 HTML 页面使用段落翻译 |
 
-不注入普通网页，不使用 `debugger` 权限，不修改浏览器默认 PDF 打开方式。
+网页脚本在页面中显示译文。密钥保险箱与翻译服务请求由扩展后台管理，浏览器自带的 PDF 阅读器仍可照常使用。
 
 ## 验证与源码
 
 - `node tests/core.test.mjs`：10 项换行处理与剪贴板行为测试。
+- `node tests/bilingual.test.mjs`：字幕断句、时间轴、预取窗口、谷歌和模型批量翻译协议。
+- `CHROME_BIN=/path/to/chrome node tests/bilingual-smoke.mjs`：使用测试视频页面、真实媒体时钟与本机模拟模型，验证 Shift、播放前预译、拖动、错误重试、切换视频及字幕轨道。
 - `node tests/translation.test.mjs`：6 项加密、端点校验、翻译协议与错误保护测试。
 - `node tests/model-presets.test.mjs`：11 项预设、参数映射、型号限制、旧版兼容、中转地址及截断处理测试。
 - `CHROME_BIN=/path/to/chrome node tests/chrome-smoke.mjs`：原有内置 PDF 阅读器的 6 项集成检查。
@@ -147,7 +161,7 @@ v1.2.1 关闭了 PDF.js 默认开启的可选 WebGPU 渲染路径，使用普通
 - `CHROME_BIN=/path/to/chrome node tests/render-smoke.mjs /path/to/document.pdf`：检查无 WebGPU 探测及适配器警告、PDF 渲染、文字层和复制换行处理；省略文件路径时使用生成的测试 PDF。
 - `python3 package.py --output-dir dist`：生成安装 ZIP 和 SHA-256 校验文件。安装包不包含截图、测试脚本、Git 数据或发布工具；这些文件保留在源码仓库中。
 
-集成测试使用 Node.js 22+ 及独立的无界面 Chrome for Testing，不接触正常浏览器配置或桌面剪贴板。已在 Chrome for Testing 156.0.8078.47 / Linux 验证；谷歌接口另用公开示例验证返回中文。未进行 Edge 实机测试，也未使用真实的 GPT / DeepSeek 付费账号或用户的中转站进行端到端测试。
+集成测试使用 Node.js 22+ 和独立的 Chrome for Testing 配置。v1.3.0 在 Linux 的 Chrome for Testing 158.0.8127.36 中验证了 PDF、网页段落和双语字幕。在真实视频页面暂停于 0 秒时，扩展使用页面文字稿一次提交了 11 句字幕，定位到第 12 秒时显示对应的谷歌中文译文。模型测试使用本机模拟服务。 [实测公开视频](https://www.youtube.com/watch?v=M7lc1UVf-VE)
 
 v1.2.1 使用 arXiv `2605.00080` 的公开 PDF 复现了适配器警告（文档指纹 `712b8842c92b22aff711834cd5ee7579`、43 页）；该文件下载后由本机测试服务提供，验证首屏渲染、文字选择和复制。未逐页检查全部 43 页。
 

@@ -30,7 +30,7 @@ export function makePdf() {
 }
 
 export async function launchBrowser() {
-  const root = fileURLToPath(new URL('../', import.meta.url));
+  const root = process.env.EXTENSION_DIR || fileURLToPath(new URL('../', import.meta.url));
   const profile = await mkdtemp(join(tmpdir(), 'pdf-translation-test-'));
   const browser = spawn(process.env.CHROME_BIN || 'chromium', [
     '--headless=new', '--ozone-platform=headless', '--no-sandbox', '--disable-dev-shm-usage',
@@ -55,9 +55,14 @@ export async function launchBrowser() {
     let id = 0;
     const pending = new Map();
     const events = [];
+    const listeners = new Set();
     socket.addEventListener('message', ({ data }) => {
       const message = JSON.parse(data);
-      if (!message.id) { if (message.method === 'Runtime.exceptionThrown' || message.method === 'Log.entryAdded') events.push(message); return; }
+      if (!message.id) {
+        if (message.method === 'Runtime.exceptionThrown' || message.method === 'Log.entryAdded') events.push(message);
+        for (const listener of listeners) listener(message);
+        return;
+      }
       const item = pending.get(message.id);
       if (!item) return;
       pending.delete(message.id);
@@ -97,6 +102,6 @@ export async function launchBrowser() {
       await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0), modifiers: 2 }, session);
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0), modifiers: 2 }, session);
     };
-    return { send, evaluate, page, shortcut, origin, events, log: () => log, close };
+    return { send, evaluate, page, shortcut, origin, events, onEvent: listener => listeners.add(listener), log: () => log, close };
   } catch (error) { await close(); throw new Error(`${error.message}\n${log}`); }
 }

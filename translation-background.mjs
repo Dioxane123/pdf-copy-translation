@@ -1,5 +1,5 @@
 import { encryptApiKey, decryptApiKey } from './crypto.mjs';
-import { DEFAULT_TRANSLATION, normalizeEndpoint, translateText, validateSettings } from './translation.mjs';
+import { DEFAULT_TRANSLATION, normalizeEndpoint, translateCaptions, translateText, validateSettings } from './translation.mjs';
 import { normalizeModelSettings } from './model-presets.mjs';
 
 const pending = new Map();
@@ -19,9 +19,29 @@ async function publicSettings() {
   return { settings, hasKey: Boolean(stored[vaultKey]), unlocked: Boolean(session[sessionKey]?.endpoint === endpoint && session[sessionKey]?.apiKey) };
 }
 
+function pageOptions(settings = {}) {
+  return {
+    paragraphEnabled: settings.paragraphEnabled ?? DEFAULT_TRANSLATION.paragraphEnabled,
+    youtubeEnabled: Boolean(settings.youtubeEnabled),
+    target: settings.target ?? DEFAULT_TRANSLATION.target,
+  };
+}
+
+async function notifyPages() {
+  const state = await publicSettings();
+  const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*', 'file:///*'] });
+  const message = { type: 'translation-options-changed', options: pageOptions(state.settings) };
+  await Promise.allSettled(tabs.map(tab => chrome.tabs.sendMessage(tab.id, message)));
+  return state;
+}
+
 export async function handleTranslationMessage(message, sender) {
-  if (!extensionPage(sender, ['options.html', 'popup.html', 'pdfjs/web/viewer.html'])) throw new Error('此页面不能访问翻译服务。');
-  if (message.type === 'translation-settings') return publicSettings();
+  const reader = extensionPage(sender, ['pdfjs/web/viewer.html']);
+  const webpage = sender.id === chrome.runtime.id && Number.isInteger(sender.tab?.id) && /^(https?|file):\/\//.test(sender.url || '');
+  if (webpage && message.type === 'translation-page-options') {
+    return pageOptions((await chrome.storage.local.get(settingsKey))[settingsKey]);
+  }
+  if (message.type === 'translation-settings' && (reader || extensionPage(sender, ['options.html', 'popup.html']))) return publicSettings();
   if (message.type === 'translation-save') {
     if (!extensionPage(sender, ['options.html'])) throw new Error('请在设置页面操作。');
     const settings = validateSettings(message.settings);
@@ -40,7 +60,7 @@ export async function handleTranslationMessage(message, sender) {
     await chrome.storage.local.set({ [settingsKey]: settings, ...(vault ? { [vaultKey]: vault } : {}) });
     if (unlocked) await chrome.storage.session.set({ [sessionKey]: unlocked });
     cancelAll();
-    return publicSettings();
+    return notifyPages();
   }
   if (message.type === 'translation-unlock') {
     if (!extensionPage(sender, ['options.html'])) throw new Error('请在设置页面解锁。');
@@ -49,39 +69,54 @@ export async function handleTranslationMessage(message, sender) {
     const apiKey = await decryptApiKey(stored[vaultKey], message.password, endpoint);
     // storage.session is RAM-only and restricted to trusted extension contexts.
     await chrome.storage.session.set({ [sessionKey]: { endpoint, apiKey } });
-    return publicSettings();
+    return notifyPages();
   }
   if (message.type === 'translation-lock' || message.type === 'translation-delete-key') {
     if (!extensionPage(sender, ['options.html'])) throw new Error('请在设置页面操作。');
     cancelAll();
     await chrome.storage.session.remove(sessionKey);
     if (message.type === 'translation-delete-key') await chrome.storage.local.remove(vaultKey);
-    return publicSettings();
+    return notifyPages();
   }
-  if (!extensionPage(sender, ['pdfjs/web/viewer.html'])) throw new Error('请在扩展 PDF 阅读模式中翻译。');
-  const owner = sender.documentId || `${sender.tab?.id}:${sender.frameId}`;
+  const scope = reader ? 'reader' : message.scope;
+  const youtube = webpage && /^https:\/\/(?:www\.|m\.)?youtube\.com\/|^https:\/\/www\.youtube-nocookie\.com\//.test(sender.url);
+  if (!reader && !(webpage && scope === 'paragraph') && !(youtube && scope === 'youtube')) throw new Error('此页面不能访问翻译服务。');
+  if (typeof message.requestId !== 'string' || !message.requestId || message.requestId.length > 100) throw new Error('翻译请求无效。');
+  const document = sender.documentId || `${sender.tab?.id}:${sender.frameId}`;
+  const owner = JSON.stringify([document, scope, scope === 'paragraph' ? message.requestId : '']);
   if (message.type === 'translation-cancel') {
     const job = pending.get(owner);
     if (job?.requestId === message.requestId) job.controller.abort();
     return { ok: true };
   }
-  if (message.type !== 'translation-run') throw new Error('未知翻译操作。');
-  const { settings } = await publicSettings();
-  if (!settings.enabled) throw new Error('复制翻译尚未开启，请在翻译设置中启用。');
-  const session = await chrome.storage.session.get(sessionKey);
-  const unlocked = session[sessionKey];
-  const apiKey = settings.provider === 'model' && unlocked?.endpoint === normalizeEndpoint(settings.baseUrl) ? unlocked.apiKey : null;
+  if (message.type !== (scope === 'youtube' ? 'translation-captions' : 'translation-run')) throw new Error('未知翻译操作。');
   pending.get(owner)?.controller.abort();
   const controller = new AbortController();
   const job = { controller, requestId: message.requestId, tabId: sender.tab?.id };
   pending.set(owner, job);
-  let timedOut = false;
-  const timeout = settings.provider === 'model' ? settings.timeoutSeconds : 25;
-  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeout * 1000);
+  let timer, timeout, timedOut = false;
   // Keep the worker alive only while this bounded translation request is pending.
   const keepAlive = setInterval(() => { void chrome.runtime.getPlatformInfo().catch(() => {}); }, 20000);
   try {
-    const translation = await translateText({ text: message.text, settings, apiKey, signal: controller.signal });
+    const saved = (await chrome.storage.local.get(settingsKey))[settingsKey];
+    const settings = { ...DEFAULT_TRANSLATION, ...saved, ...normalizeModelSettings(saved) };
+    if (reader && !settings.enabled) throw new Error('复制翻译尚未开启，请在翻译设置中启用。');
+    if (scope === 'paragraph' && !settings.paragraphEnabled) throw new Error('网页段落翻译已关闭。');
+    if (scope === 'youtube' && !settings.youtubeEnabled) throw new Error('YouTube 双语字幕已关闭。');
+    let apiKey;
+    if (settings.provider === 'model') {
+      const unlocked = (await chrome.storage.session.get(sessionKey))[sessionKey];
+      if (unlocked?.endpoint === normalizeEndpoint(settings.baseUrl)) apiKey = unlocked.apiKey;
+    }
+    controller.signal.throwIfAborted();
+    timeout = settings.provider === 'model' ? settings.timeoutSeconds : 25;
+    timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeout * 1000);
+    const options = { settings, apiKey, signal: controller.signal };
+    if (scope === 'youtube') {
+      const translations = await translateCaptions({ ...options, texts: message.texts });
+      return { translations, requestId: message.requestId, target: settings.target };
+    }
+    const translation = await translateText({ ...options, text: message.text });
     return { translation, requestId: message.requestId, target: settings.target };
   } catch (error) {
     if (controller.signal.aborted) throw new Error(timedOut ? `翻译超过 ${timeout} 秒，可在设置中延长等待上限或降低推理强度。` : '翻译已取消。');

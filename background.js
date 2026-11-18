@@ -124,6 +124,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 async function handleMessage(message, sender) {
   await ready;
   if (message.type?.startsWith('translation-')) return handleTranslationMessage(message, sender);
+  if (!sender.url?.startsWith(chrome.runtime.getURL(''))) throw new Error('此操作仅供扩展页面使用。');
   if (message.type === 'open-reader') {
     if (sender.url?.split(/[?#]/)[0] !== chrome.runtime.getURL('popup.html')) throw new Error('请通过扩展面板打开。');
     const tab = await activeTab();
