@@ -28,6 +28,7 @@ runtime_names = [
     "src/ui/popup.html", "src/ui/popup.css", "src/ui/popup.js",
     "src/web/web-content.js", "src/youtube/youtube-player.js", "src/youtube/youtube-captions.js",
     "src/youtube/youtube-source.js", "src/youtube/youtube-controls.js", "src/youtube/youtube.js", "src/youtube/youtube.css",
+    "src/youtube/caption-translation.png",
 ]
 files = [root / name for name in runtime_names]
 for path in files:

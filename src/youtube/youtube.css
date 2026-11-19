@@ -1,23 +1,24 @@
 .html5-video-player[data-pdf-copy-captions] .ytp-caption-window-container {
   visibility: hidden !important;
 }
-.pdf-copy-caption-toggle .pdf-copy-caption-icon {
+.ytp-button.pdf-copy-caption-toggle {
   position: relative;
-  display: inline-block;
-  width: 23px;
-  height: 23px;
-  box-sizing: border-box;
-  vertical-align: middle;
-  border-radius: 5px;
-  padding: 2px 8px 6px 2px;
-  background: rgb(85 85 85 / 85%);
-  color: white;
-  font: 700 14px/16px Roboto, Arial, sans-serif;
-  text-align: center;
-  text-shadow: none;
+  vertical-align: top;
 }
-.pdf-copy-caption-toggle[aria-pressed="true"] .pdf-copy-caption-icon { background: #d93681; }
-.pdf-copy-caption-icon > span { position: absolute; right: 2px; bottom: 1px; font: 700 12px/13px Roboto, Arial, sans-serif; }
+/* Center the artwork inside YouTube's button, independently of its text baseline. */
+.pdf-copy-caption-toggle > .pdf-copy-caption-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 60%;
+  max-height: 60%;
+  pointer-events: none;
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 60%));
+}
+.pdf-copy-caption-toggle[aria-pressed="false"] > .pdf-copy-caption-icon { opacity: .55; }
 .pdf-copy-caption-toggle:focus-visible { outline: 2px solid white; outline-offset: -3px; }
 [data-pdf-copy-translation="youtube"] {
   position: absolute;

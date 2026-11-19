@@ -44,14 +44,18 @@ function installFixture() {
 }
 const html = `<!doctype html><meta charset="utf-8"><style>
 body{margin:0}#movie_player{position:relative;height:300px;width:800px}p{padding:10px}
-.ytp-right-controls{position:absolute;bottom:0;right:0}.ytp-button{width:40px;height:36px}
+.ytp-right-controls{position:absolute;bottom:0;right:0;text-align:left;line-height:56px}
+.ytp-right-controls-left{display:flex;align-items:flex-end}
+.ytp-button{width:48px;height:40px;padding:0;border:0;text-align:inherit;line-height:inherit}
+.compact .ytp-button{width:36px;height:32px}
+.ytp-subtitles-button{display:grid;place-items:center}.ytp-subtitles-button span{line-height:normal}
 .ytp-caption-segment{font:italic 600 24px/32px Georgia,serif;color:rgb(195,227,242);background:rgba(15,20,25,.72);text-shadow:1px 1px 2px black}
 ytd-comment-view-model,ytd-expander,ytd-comment-renderer{display:block}.clip{overflow:hidden;max-height:20px}
 </style>
 <div id="movie_player" class="html5-video-player"><video muted preload="auto"></video>
 <div class="ytp-caption-window-container" hidden><span class="ytp-caption-segment">Native</span></div>
 <div class="ytp-right-controls"><div class="ytp-right-controls-left"><button class="ytp-button">Auto</button>
-<button class="ytp-subtitles-button ytp-button" aria-pressed="false">CC</button></div></div></div>
+<button class="ytp-subtitles-button ytp-button" aria-pressed="false"><span>CC</span></button></div></div></div>
 <p id="paragraph">A <em>web paragraph</em> with a link.</p><textarea>Editable text</textarea>
 <ytd-comment-view-model id="comment"><div>Comment author</div><ytd-expander><div class="clip">
 <yt-attributed-string slot="content"><span>Useful <a id="mention" href="#speaker">@speaker</a>!<br>More text <img alt="🙂"></span></yt-attributed-string>
@@ -143,6 +147,35 @@ try {
   const pressed = selector => read(`document.querySelector(${JSON.stringify(selector)})?.getAttribute('aria-pressed')`);
   await until(async () => await pressed(toggle) === 'true', 'translation on by default');
   assert.ok(await read("document.querySelector('.ytp-right-controls-left').firstElementChild.matches('.pdf-copy-caption-toggle')"));
+  const layouts = await read(`(async () => {
+    const button = document.querySelector('.pdf-copy-caption-toggle');
+    const icon = button.querySelector('img');
+    await icon.decode();
+    const cc = document.querySelector('.ytp-subtitles-button');
+    const bar = button.parentElement;
+    function measure() {
+      const b = button.getBoundingClientRect(), i = icon.getBoundingClientRect();
+      const c = cc.getBoundingClientRect(), glyph = cc.firstElementChild.getBoundingClientRect();
+      return {
+        dx: i.x + i.width / 2 - (b.x + b.width / 2),
+        dy: i.y + i.height / 2 - (glyph.y + glyph.height / 2),
+        sameSlot: b.width === c.width && b.height === c.height,
+        size: i.width, square: i.width === i.height,
+        hit: document.elementFromPoint(i.x + i.width / 2, i.y + i.height / 2) === button,
+      };
+    }
+    const normal = measure();
+    bar.classList.add('compact');
+    const compact = measure();
+    bar.classList.remove('compact');
+    return [normal, compact];
+  })()`);
+  for (const layout of layouts) {
+    assert.ok(Math.abs(layout.dx) <= 0.5 && Math.abs(layout.dy) <= 0.5, JSON.stringify(layout));
+    assert.ok(layout.sameSlot && layout.square && layout.hit);
+  }
+  assert.ok(layouts[1].size > 0 && layouts[1].size < layouts[0].size);
+  console.log('PASS: packaged icon loads, scales and stays centered with CC in both toolbar sizes');
   assert.equal(await pressed(nativeCC), 'false');
   assert.equal(await overlayHidden(), true);
   await delay(350);

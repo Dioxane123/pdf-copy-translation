@@ -3,13 +3,11 @@ function createYouTubeCaptionView({ toggle, retry, ccChanged }) {
   button.type = 'button';
   button.className = 'ytp-button pdf-copy-caption-toggle';
   button.setAttribute('aria-label', '字幕翻译');
-  const icon = document.createElement('span');
+  const icon = document.createElement('img');
   icon.className = 'pdf-copy-caption-icon';
-  icon.setAttribute('aria-hidden', 'true');
-  icon.textContent = '文';
-  const latin = document.createElement('span');
-  latin.textContent = 'A';
-  icon.append(latin);
+  icon.src = chrome.runtime.getURL('src/youtube/caption-translation.png');
+  icon.alt = '';
+  icon.draggable = false;
   button.append(icon);
 
   const overlay = document.createElement('div');
